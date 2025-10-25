@@ -90,7 +90,7 @@ export async function getPersonas(): Promise<Persona[]> {
   const res = db.exec(
     `SELECT id,name,color,bio FROM personas ORDER BY name ASC;`
   );
-  const values = res[0]?.values ?? [];
+  const values = (res[0]?.values ?? []) as [string, string, string, string][];
   return values.map(([id, name, color, bio]) => ({
     id: id as string,
     name: name as string,

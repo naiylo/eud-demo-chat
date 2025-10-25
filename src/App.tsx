@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import "./styles/styles.css";
 import { getPersonas, getMessages, addMessage } from "./db/sqlite";
 import type { Persona, Message } from "./db/sqlite";

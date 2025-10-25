@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 export function DataPanel({ data }: { data: unknown }) {
   const formatted = useMemo(() => JSON.stringify(data, null, 2), [data]);

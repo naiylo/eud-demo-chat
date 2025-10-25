@@ -1,4 +1,3 @@
-import React from "react";
 import type { Persona } from "../db/sqlite";
 
 export function PersonaSidebar({

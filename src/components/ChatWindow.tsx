@@ -1,4 +1,3 @@
-import React from "react";
 import type { Persona, Message } from "../db/sqlite";
 import { MessageList } from "./MessageList";
 import { Composer } from "./Composer";

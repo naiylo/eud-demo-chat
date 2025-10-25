@@ -1,4 +1,3 @@
-import React from "react";
 import type { Persona, Message } from "../db/sqlite";
 
 export function MessageBubble({

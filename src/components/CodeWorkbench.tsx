@@ -10,10 +10,9 @@ const DEFAULT_POLL_JSON = `{
 }`;
 
 export function CodeWorkbench({
-  personas,
   onCreatePoll,
 }: {
-  personas: Persona[];
+  personas?: Persona[];
   onCreatePoll: (config: {
     question: string;
     options: string[];

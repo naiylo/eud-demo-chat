@@ -1,0 +1,14 @@
+/* Utilities */
+
+.card-like {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  transition: transform 0.06s ease, box-shadow 0.2s ease;
+}
+.card-like:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(8, 14, 33, 0.45);
+}
+

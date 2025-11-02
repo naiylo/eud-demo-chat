@@ -46,11 +46,7 @@ body,
 body {
   margin: 0;
   font-family: var(--font-sans);
-  background: radial-gradient(
-    1200px 800px at 10% 10%,
-    #101735 0%,
-    var(--bg) 60%
-  );
+  background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -295,12 +291,7 @@ pre {
 .chat-window__header {
   padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--border);
-  background: linear-gradient(
-      0deg,
-      rgba(255, 255, 255, 0.05),
-      rgba(255, 255, 255, 0.05)
-    ),
-    var(--surface);
+  background: var(--surface);
 }
 
 .chat-window__header h2 {
@@ -383,11 +374,7 @@ pre {
 .composer {
   border-top: 1px solid var(--border);
   padding: var(--space-4) var(--space-5) var(--space-5);
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.02),
-    rgba(255, 255, 255, 0)
-  );
+  background: var(--surface);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);

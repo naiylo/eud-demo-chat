@@ -14,9 +14,11 @@ function useAutoScroll(deps: any[]) {
 export function MessageList({
   messages,
   personas,
+  currentActorId,
 }: {
   messages: Message[];
   personas: Persona[];
+  currentActorId: string;
 }) {
   const ref = useAutoScroll([messages.length]);
   const byId = useMemo(
@@ -31,7 +33,13 @@ export function MessageList({
   return (
     <section className="message-stream" ref={ref}>
       {messages.map((m) => (
-        <MessageBubble key={m.id} message={m} persona={byId[m.authorId]} />
+        <MessageBubble
+          key={m.id}
+          message={m}
+          persona={byId[m.authorId]}
+          personas={personas}
+          currentActorId={currentActorId}
+        />
       ))}
       {messages.length === 0 && (
         <div className="empty-state">

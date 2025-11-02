@@ -20,7 +20,11 @@ export function ChatWindow({
       <header className="chat-window__header">
         <h2>Conversation</h2>
       </header>
-      <MessageList messages={messages} personas={personas} />
+      <MessageList
+        messages={messages}
+        personas={personas}
+        currentActorId={selectedAuthorId}
+      />
       <Composer
         personas={personas}
         selectedAuthorId={selectedAuthorId}

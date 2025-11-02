@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./styles/styles.css";
-import { getPersonas, getMessages, addMessage } from "./db/sqlite";
-import type { Persona, Message } from "./db/sqlite";
+import { getPersonas, getMessages, addMessage, createPoll } from "./db/sqlite";
+import type { Persona, Message, Poll, PollConfig } from "./db/sqlite";
 import { PersonaSidebar } from "./components/PersonaSidebar";
 import { ChatWindow } from "./components/ChatWindow";
 import { DataPanel } from "./components/DataPanel";
@@ -32,6 +32,34 @@ export default function App() {
     setMessages((cur) => [...cur, msg]);
   };
 
+  const handleCreatePoll = async ({
+    question,
+    options,
+    config,
+  }: {
+    question: string;
+    options: string[];
+    config: PollConfig;
+  }) => {
+    const poll: Poll = {
+      id: `poll-${Date.now()}`,
+      creatorId: selectedAuthorId,
+      question,
+      options,
+      config,
+      timestamp: new Date().toISOString(),
+    };
+    await createPoll(poll);
+    const msg: Message = {
+      id: `msg-${Date.now()}-poll`,
+      authorId: selectedAuthorId,
+      text: `poll:${poll.id}`,
+      timestamp: new Date().toISOString(),
+    };
+    await addMessage(msg);
+    setMessages((cur) => [...cur, msg]);
+  };
+
   return (
     <div className="app app--wide">
       <header className="app-header">
@@ -51,7 +79,7 @@ export default function App() {
             selectedId={selectedAuthorId}
             onSelect={setSelectedAuthorId}
           />
-          <CodeWorkbench />
+          <CodeWorkbench personas={personas} onCreatePoll={handleCreatePoll} />
         </div>
         <div className="layout__main">
           <ChatWindow

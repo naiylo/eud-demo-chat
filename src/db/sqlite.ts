@@ -32,6 +32,37 @@ export interface Message {
   timestamp: string;
 }
 
+export interface PollConfig {
+  visibility: {
+    // 'all' => everyone sees results; 'voters' => only after voting; 'creatorOnly' => only creator
+    resultsVisibleTo: "all" | "voters" | "creatorOnly";
+  };
+  eligibility: {
+    // If empty or missing => all personas can vote
+    allowedPersonaIds?: string[];
+  };
+  voting: {
+    multiple: boolean; // allow multiple options
+    allowChangeVote: boolean; // allow changing selection(s)
+  };
+}
+
+export interface Poll {
+  id: string;
+  creatorId: string;
+  question: string;
+  options: string[];
+  config: PollConfig;
+  timestamp: string;
+}
+
+export interface Vote {
+  pollId: string;
+  voterId: string;
+  optionIndex: number;
+  timestamp: string;
+}
+
 export async function getDB(): Promise<Database> {
   if (db) return db;
 
@@ -54,6 +85,26 @@ export async function getDB(): Promise<Database> {
       text TEXT NOT NULL,
       timestamp TEXT NOT NULL,
       FOREIGN KEY(authorId) REFERENCES personas(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS polls(
+      id TEXT PRIMARY KEY,
+      creatorId TEXT NOT NULL,
+      question TEXT NOT NULL,
+      optionsJson TEXT NOT NULL,
+      configJson TEXT NOT NULL,
+      timestamp TEXT NOT NULL,
+      FOREIGN KEY(creatorId) REFERENCES personas(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS votes(
+      pollId TEXT NOT NULL,
+      voterId TEXT NOT NULL,
+      optionIndex INTEGER NOT NULL,
+      timestamp TEXT NOT NULL,
+      PRIMARY KEY (pollId, voterId, optionIndex),
+      FOREIGN KEY(pollId) REFERENCES polls(id),
+      FOREIGN KEY(voterId) REFERENCES personas(id)
     );
   `);
 
@@ -132,5 +183,102 @@ export async function addMessage(msg: Message) {
   );
   stmt.run([msg.id, msg.authorId, msg.text, msg.timestamp]);
   stmt.free();
+  persist();
+}
+
+export async function createPoll(poll: Poll) {
+  const db = await getDB();
+  const stmt = db.prepare(
+    `INSERT INTO polls (id,creatorId,question,optionsJson,configJson,timestamp) VALUES (?,?,?,?,?,?)`
+  );
+  stmt.run([
+    poll.id,
+    poll.creatorId,
+    poll.question,
+    JSON.stringify(poll.options),
+    JSON.stringify(poll.config),
+    poll.timestamp,
+  ]);
+  stmt.free();
+  persist();
+}
+
+export async function getPollById(id: string): Promise<Poll | null> {
+  const db = await getDB();
+  const stmt = db.prepare(
+    `SELECT id,creatorId,question,optionsJson,configJson,timestamp FROM polls WHERE id = ?`
+  );
+  stmt.bind([id]);
+  let out: Poll | null = null;
+  if (stmt.step()) {
+    const row = stmt.getAsObject() as any;
+    out = {
+      id: row.id,
+      creatorId: row.creatorId,
+      question: row.question,
+      options: JSON.parse(row.optionsJson || "[]"),
+      config: JSON.parse(row.configJson || "{}"),
+      timestamp: row.timestamp,
+    } as Poll;
+  }
+  stmt.free();
+  return out;
+}
+
+export async function getVotesByPollId(pollId: string): Promise<Vote[]> {
+  const db = await getDB();
+  const stmt = db.prepare(
+    `SELECT pollId,voterId,optionIndex,timestamp FROM votes WHERE pollId = ?`
+  );
+  stmt.bind([pollId]);
+  const rows: Vote[] = [];
+  while (stmt.step()) {
+    const r = stmt.getAsObject() as any;
+    rows.push({
+      pollId: r.pollId,
+      voterId: r.voterId,
+      optionIndex: r.optionIndex,
+      timestamp: r.timestamp,
+    });
+  }
+  stmt.free();
+  return rows;
+}
+
+export async function upsertVote(
+  poll: Poll,
+  voterId: string,
+  optionIndex: number
+): Promise<void> {
+  const db = await getDB();
+  const now = new Date().toISOString();
+
+  // For single-choice polls, ensure only one vote per voter
+  if (!poll.config.voting.multiple) {
+    // Delete any existing votes for this voter on this poll
+    const del = db.prepare(`DELETE FROM votes WHERE pollId = ? AND voterId = ?`);
+    del.run([poll.id, voterId]);
+    del.free();
+  }
+
+  const stmt = db.prepare(
+    `INSERT OR REPLACE INTO votes (pollId,voterId,optionIndex,timestamp) VALUES (?,?,?,?)`
+  );
+  stmt.run([poll.id, voterId, optionIndex, now]);
+  stmt.free();
+  persist();
+}
+
+export async function deleteVote(
+  pollId: string,
+  voterId: string,
+  optionIndex: number
+): Promise<void> {
+  const db = await getDB();
+  const del = db.prepare(
+    `DELETE FROM votes WHERE pollId = ? AND voterId = ? AND optionIndex = ?`
+  );
+  del.run([pollId, voterId, optionIndex]);
+  del.free();
   persist();
 }

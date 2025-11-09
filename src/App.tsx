@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
-import "./styles/styles.css";
 import { getPersonas, getMessages, addMessage, createPoll } from "./db/sqlite";
 import type { Persona, Message, Poll, PollConfig } from "./db/sqlite";
 import { PersonaSidebar } from "./components/PersonaSidebar";
 import { ChatWindow } from "./components/ChatWindow";
 import { DataPanel } from "./components/DataPanel";
-import { CodeWorkbench } from "./components/CodeWorkbench";
+
+import "./styles/styles.css";
 
 export default function App() {
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedAuthorId, setSelectedAuthorId] = useState("");
+  const [showDataPanel, setShowDataPanel] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -62,16 +63,6 @@ export default function App() {
 
   return (
     <div className="app app--wide">
-      <header className="app-header">
-        <div>
-          <h1>Chat Personas Studio</h1>
-          <p>
-            A cleaner layout with sidebar author switching, a real chat window,
-            a separate code input area, and an expandable JSON view.
-          </p>
-        </div>
-      </header>
-
       <main className="layout layout--with-sidebar">
         <div className="layout__sidebar">
           <PersonaSidebar
@@ -79,7 +70,6 @@ export default function App() {
             selectedId={selectedAuthorId}
             onSelect={setSelectedAuthorId}
           />
-          <CodeWorkbench personas={personas} onCreatePoll={handleCreatePoll} />
         </div>
         <div className="layout__main">
           <ChatWindow
@@ -88,8 +78,13 @@ export default function App() {
             selectedAuthorId={selectedAuthorId}
             onAuthorChange={setSelectedAuthorId}
             onSend={handleSend}
+            onOpenData={() => setShowDataPanel(true)}
           />
-          <DataPanel data={{ personas, messages }} />
+          <DataPanel
+            data={{ personas, messages }}
+            open={showDataPanel}
+            onClose={() => setShowDataPanel(false)}
+          />
         </div>
       </main>
     </div>

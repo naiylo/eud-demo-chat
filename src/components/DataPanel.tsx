@@ -1,22 +1,48 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 
-export function DataPanel({ data }: { data: unknown }) {
+export function DataPanel({
+  data,
+  open,
+  onClose,
+}: {
+  data: unknown;
+  open: boolean;
+  onClose: () => void;
+}) {
   const formatted = useMemo(() => JSON.stringify(data, null, 2), [data]);
-  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
 
   return (
-    <section className={`data-panel ${expanded ? "data-panel--expanded" : ""}`}>
-      <header className="panel-header">
-        <h3>Conversation JSON</h3>
-        <div className="panel-actions">
-          <button type="button" onClick={() => setExpanded(!expanded)}>
-            {expanded ? "Close" : "Expand"}
-          </button>
-        </div>
-      </header>
-      <pre>
-        <code>{formatted}</code>
-      </pre>
-    </section>
+    <div className="data-modal-overlay" onClick={onClose}>
+      <div
+        className="data-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="data-modal-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="panel-header">
+          <h3 id="data-modal-title">Conversation JSON</h3>
+          <div className="panel-actions">
+            <button type="button" onClick={onClose} aria-label="Close JSON panel">
+              Close
+            </button>
+          </div>
+        </header>
+        <pre>
+          <code>{formatted}</code>
+        </pre>
+      </div>
+    </div>
   );
 }

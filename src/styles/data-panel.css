@@ -1,43 +1,40 @@
-/* Data Panel (JSON) */
+/* Data Panel Modal */
 
-.data-panel {
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
-  padding: var(--space-5);
-  border: 1px solid var(--border);
+.data-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 60;
 }
 
-.data-panel .panel-header {
+.data-modal {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--border);
+  padding: var(--space-6);
+  width: min(960px, 100%);
+  max-height: 80vh;
+  overflow: hidden;
+}
+
+.data-modal .panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--space-3);
 }
 
-.data-panel pre {
-  max-height: 50vh;
+.data-modal pre {
+  max-height: calc(80vh - 120px);
   overflow: auto;
 }
 
-.data-panel .panel-actions button {
+.data-modal .panel-actions button {
   background: #1a2a55;
   border-color: #253d7c;
 }
-
-/* Expanded (full-window) mode */
-.data-panel--expanded {
-  position: fixed;
-  inset: 24px;
-  z-index: 50;
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.6);
-  padding: var(--space-6);
-  border: 1px solid var(--border);
-}
-
-.data-panel--expanded pre {
-  max-height: calc(100vh - 160px);
-}
-

@@ -10,12 +10,18 @@
   padding: 0;
   border: 1px solid var(--border);
   overflow: hidden;
+  flex: 1;        /* fill available height in main column */
+  min-height: 0;  /* allow inner scroller to size */
 }
 
 .chat-window__header {
   padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--border);
   background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
 }
 
 .chat-window__header h2 {
@@ -27,10 +33,11 @@
 .message-stream {
   padding: var(--space-5);
   overflow: auto;
-  max-height: 60vh;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  flex: 1;        /* take remaining space below header */
+  min-height: 0;  /* enable scrolling within */
 }
 
 /* Empty state */
@@ -46,7 +53,6 @@
 /* Responsive: message stream height */
 @media (max-width: 1180px) {
   .message-stream {
-    max-height: 56vh;
+    /* use flex layout instead of fixed heights on small screens too */
   }
 }
-

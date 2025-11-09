@@ -12,6 +12,7 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedAuthorId, setSelectedAuthorId] = useState("");
   const [showDataPanel, setShowDataPanel] = useState(false);
+  const [workbenchCode, setWorkbenchCode] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -69,6 +70,8 @@ export default function App() {
             personas={personas}
             selectedId={selectedAuthorId}
             onSelect={setSelectedAuthorId}
+            workbenchCode={workbenchCode}
+            onWorkbenchChange={setWorkbenchCode}
           />
         </div>
         <div className="layout__main">
@@ -81,7 +84,7 @@ export default function App() {
             onOpenData={() => setShowDataPanel(true)}
           />
           <DataPanel
-            data={{ personas, messages }}
+            data={{ personas, messages, workbench: { code: workbenchCode } }}
             open={showDataPanel}
             onClose={() => setShowDataPanel(false)}
           />

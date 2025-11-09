@@ -1,55 +1,37 @@
 import { useMemo, useState } from "react";
-import { safeCompile, EXAMPLE_DSL } from "../dsl/compiler";
 
 export function WidgetWorkbench({
   code,
   onChange,
   open,
   onClose,
-  onSendMessage,
-  onCreatePoll,
-  selectedAuthorId,
 }: {
   code: string;
   onChange: (code: string) => void;
   open: boolean;
   onClose: () => void;
   onSendMessage: (text: string, authorId: string) => void;
-  onCreatePoll: (input: { question: string; options: string[]; config: { multi: boolean } }) => Promise<void> | void;
+  onCreatePoll: (input: {
+    question: string;
+    options: string[];
+    config: { multi: boolean };
+  }) => Promise<void> | void;
   selectedAuthorId: string;
 }) {
   const [mode, setMode] = useState<"message" | "widget">("message");
   const [messageText, setMessageText] = useState("");
 
   const compileOutcome = useMemo(() => {
-    if (mode !== "widget" || !code.trim()) return { ok: false, error: "" } as const;
-    return safeCompile(code);
+    if (mode !== "widget" || !code.trim())
+      return { ok: false, error: "" } as const;
+    return { ok: false, error: "" } as const;
   }, [mode, code]);
 
   if (!open) return null;
 
-  const sendMessage = () => {
-    const t = messageText.trim();
-    if (!t) return;
-    onSendMessage(t, selectedAuthorId);
-    setMessageText("");
-    onClose();
-  };
+  const sendMessage = () => {};
 
-  const buildAndSendWidget = async () => {
-    if (!compileOutcome.ok) return;
-    const res = compileOutcome.result;
-    if (res.kind === "createPoll") {
-      await onCreatePoll({
-        question: res.question,
-        options: res.options,
-        config: { multi: res.config.multi },
-      });
-    } else if (res.kind === "message") {
-      onSendMessage(res.text, selectedAuthorId);
-    }
-    onClose();
-  };
+  const buildAndSendWidget = async () => {};
 
   return (
     <div className="data-modal-overlay" onClick={onClose}>
@@ -111,17 +93,20 @@ export function WidgetWorkbench({
           <>
             <textarea
               className="workbench-editor"
-              placeholder={EXAMPLE_DSL}
               value={code}
               onChange={(e) => onChange(e.target.value)}
             />
-            {(!compileOutcome.ok && compileOutcome.error) && (
+            {!compileOutcome.ok && compileOutcome.error && (
               <div className="workbench-error" role="alert">
                 {compileOutcome.error}
               </div>
             )}
             <div>
-              <button type="button" onClick={buildAndSendWidget} disabled={!compileOutcome.ok}>
+              <button
+                type="button"
+                onClick={buildAndSendWidget}
+                disabled={!compileOutcome.ok}
+              >
                 Build & Send Widget
               </button>
             </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getPersonas, getMessages, addMessage, createPoll } from "./db/sqlite";
+import { getPersonas, getMessages, addMessage, createPoll, clearMessages, deleteMessage } from "./db/sqlite";
 import type { Persona, Message, Poll, PollConfig } from "./db/sqlite";
 import { PersonaSidebar } from "./components/PersonaSidebar";
 import { ChatWindow } from "./components/ChatWindow";
@@ -62,6 +62,16 @@ export default function App() {
     setMessages((cur) => [...cur, msg]);
   };
 
+  const handleClearMessages = async () => {
+    await clearMessages();
+    setMessages([]);
+  };
+
+  const handleDeleteMessage = async (id: string) => {
+    await deleteMessage(id);
+    setMessages((cur) => cur.filter((m) => m.id !== id));
+  };
+
   return (
     <div className="app app--wide">
       <main className="layout layout--with-sidebar">
@@ -72,6 +82,8 @@ export default function App() {
             onSelect={setSelectedAuthorId}
             workbenchCode={workbenchCode}
             onWorkbenchChange={setWorkbenchCode}
+            onSend={handleSend}
+            onCreatePoll={handleCreatePoll}
           />
         </div>
         <div className="layout__main">
@@ -82,6 +94,8 @@ export default function App() {
             onAuthorChange={setSelectedAuthorId}
             onSend={handleSend}
             onOpenData={() => setShowDataPanel(true)}
+            onClearMessages={handleClearMessages}
+            onDeleteMessage={handleDeleteMessage}
           />
           <DataPanel
             data={{ personas, messages, workbench: { code: workbenchCode } }}

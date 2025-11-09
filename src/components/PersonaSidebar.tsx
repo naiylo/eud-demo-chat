@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Persona } from "../db/sqlite";
 import { WidgetWorkbench } from "./WidgetWorkbench";
+import type { PollConfig } from "../db/sqlite";
 
 export function PersonaSidebar({
   personas,
@@ -8,12 +9,16 @@ export function PersonaSidebar({
   onSelect,
   workbenchCode,
   onWorkbenchChange,
+  onSend,
+  onCreatePoll,
 }: {
   personas: Persona[];
   selectedId: string;
   onSelect: (id: string) => void;
   workbenchCode: string;
   onWorkbenchChange: (code: string) => void;
+  onSend: (text: string, authorId: string) => void;
+  onCreatePoll: (input: { question: string; options: string[]; config: PollConfig }) => Promise<void> | void;
 }) {
   const [showWorkbench, setShowWorkbench] = useState(false);
 
@@ -61,6 +66,19 @@ export function PersonaSidebar({
         onChange={onWorkbenchChange}
         open={showWorkbench}
         onClose={() => setShowWorkbench(false)}
+        onSendMessage={onSend}
+        onCreatePoll={({ question, options, config: { multi } }) =>
+          onCreatePoll({
+            question,
+            options,
+            config: {
+              visibility: { resultsVisibleTo: "all" },
+              eligibility: {},
+              voting: { multiple: !!multi, allowChangeVote: true },
+            },
+          })
+        }
+        selectedAuthorId={selectedId}
       />
     </>
   );

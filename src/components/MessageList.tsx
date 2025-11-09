@@ -15,10 +15,12 @@ export function MessageList({
   messages,
   personas,
   currentActorId,
+  onDeleteMessage,
 }: {
   messages: Message[];
   personas: Persona[];
   currentActorId: string;
+  onDeleteMessage?: (id: string) => void;
 }) {
   const ref = useAutoScroll([messages.length]);
   const byId = useMemo(
@@ -39,6 +41,7 @@ export function MessageList({
           persona={byId[m.authorId]}
           personas={personas}
           currentActorId={currentActorId}
+          onDelete={onDeleteMessage}
         />
       ))}
       {messages.length === 0 && (

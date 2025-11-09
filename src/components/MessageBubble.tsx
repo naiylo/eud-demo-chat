@@ -3,11 +3,13 @@ import type { Persona, Message } from "../db/sqlite";
 export function MessageBubble({
   message,
   persona,
+  onDelete,
 }: {
   message: Message;
   persona?: Persona;
   currentActorId: string;
   personas: Persona[];
+  onDelete?: (id: string) => void;
 }) {
   if (!persona) return null;
   return (
@@ -31,6 +33,16 @@ export function MessageBubble({
               minute: "2-digit",
             })}
           </time>
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => onDelete(message.id)}
+              aria-label="Delete message"
+              style={{ marginLeft: 12 }}
+            >
+              Delete
+            </button>
+          )}
         </header>
         <p>{message.text}</p>
       </div>

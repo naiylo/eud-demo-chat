@@ -7,7 +7,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  min-height: 100vh; /* Fill viewport height */
+  height: 100vh; /* Fix to viewport height so inner panes scroll */
 }
 
 .app--wide {
@@ -37,6 +37,8 @@
   grid-template-columns: 320px 1fr;
   gap: var(--space-6);
   flex: 1; /* Grow to fill .app */
+  min-height: 0; /* Allow children to size/scroll */
+  overflow: hidden; /* Prevent grid from growing page height */
 }
 
 .layout__sidebar,
@@ -44,6 +46,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+  flex: 1;       /* Fill column height */
+  min-height: 0; /* Allow inner scrollers */
+  overflow: hidden; /* Contain inner scrollers */
 }
 
 /* Responsive: layout */

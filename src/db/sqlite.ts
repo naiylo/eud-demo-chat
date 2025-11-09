@@ -186,6 +186,20 @@ export async function addMessage(msg: Message) {
   persist();
 }
 
+export async function deleteMessage(id: string): Promise<void> {
+  const db = await getDB();
+  const stmt = db.prepare(`DELETE FROM messages WHERE id = ?`);
+  stmt.run([id]);
+  stmt.free();
+  persist();
+}
+
+export async function clearMessages(): Promise<void> {
+  const db = await getDB();
+  db.exec(`DELETE FROM messages;`);
+  persist();
+}
+
 export async function createPoll(poll: Poll) {
   const db = await getDB();
   const stmt = db.prepare(

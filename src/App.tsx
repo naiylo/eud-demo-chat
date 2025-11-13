@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
-import { getPersonas, getMessages, addMessage, createPoll, clearMessages, deleteMessage } from "./db/sqlite";
-import type { Persona, Message, Poll, PollConfig } from "./db/sqlite";
+import {
+  getPersonas,
+  getMessages,
+  addMessage,
+  clearMessages,
+  deleteMessage,
+} from "./db/sqlite";
+import type { Persona, Message } from "./db/sqlite";
 import { PersonaSidebar } from "./components/PersonaSidebar";
 import { ChatWindow } from "./components/ChatWindow";
 import { DataPanel } from "./components/DataPanel";
@@ -12,7 +18,6 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedAuthorId, setSelectedAuthorId] = useState("");
   const [showDataPanel, setShowDataPanel] = useState(false);
-  const [workbenchCode, setWorkbenchCode] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -29,34 +34,8 @@ export default function App() {
       authorId,
       text,
       timestamp: new Date().toISOString(),
-    };
-    await addMessage(msg);
-    setMessages((cur) => [...cur, msg]);
-  };
-
-  const handleCreatePoll = async ({
-    question,
-    options,
-    config,
-  }: {
-    question: string;
-    options: string[];
-    config: PollConfig;
-  }) => {
-    const poll: Poll = {
-      id: `poll-${Date.now()}`,
-      creatorId: selectedAuthorId,
-      question,
-      options,
-      config,
-      timestamp: new Date().toISOString(),
-    };
-    await createPoll(poll);
-    const msg: Message = {
-      id: `msg-${Date.now()}-poll`,
-      authorId: selectedAuthorId,
-      text: `poll:${poll.id}`,
-      timestamp: new Date().toISOString(),
+      type: "Message",
+      custom: [],
     };
     await addMessage(msg);
     setMessages((cur) => [...cur, msg]);
@@ -80,10 +59,7 @@ export default function App() {
             personas={personas}
             selectedId={selectedAuthorId}
             onSelect={setSelectedAuthorId}
-            workbenchCode={workbenchCode}
-            onWorkbenchChange={setWorkbenchCode}
             onSend={handleSend}
-            onCreatePoll={handleCreatePoll}
           />
         </div>
         <div className="layout__main">
@@ -98,7 +74,7 @@ export default function App() {
             onDeleteMessage={handleDeleteMessage}
           />
           <DataPanel
-            data={{ personas, messages, workbench: { code: workbenchCode } }}
+            data={{ personas, messages }}
             open={showDataPanel}
             onClose={() => setShowDataPanel(false)}
           />

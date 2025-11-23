@@ -33,17 +33,12 @@ export default function App() {
     })();
   }, []);
 
+  // Message sending is now handled by the message widget actions
   const handleSend = async (text: string, authorId: string) => {
-    const msg: Message = {
-      id: `msg-${Date.now()}`,
-      authorId,
-      text,
-      timestamp: new Date().toISOString(),
-      type: "message",
-      custom: [],
-    };
-    await addMessage(msg);
-    setMessages((cur) => [...cur, msg]);
+    const actions = widgetActions["message"] as
+      | { sendMessage: (text: string, authorId: string) => Promise<void> }
+      | undefined;
+    await actions?.sendMessage(text, authorId);
   };
 
   const widgetActions: WidgetActionMap = useMemo(() => {

@@ -31,3 +31,4 @@ export interface ChatWidgetDefinition<TActions = unknown> {
 }
 
 export type WidgetActionMap = Partial<Record<MessageType, unknown>>;
+export type AnyWidgetDefinition = ChatWidgetDefinition<any>;

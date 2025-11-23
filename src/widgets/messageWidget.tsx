@@ -1,4 +1,4 @@
-import type { Message, Persona } from "../db/sqlite";
+import type { Message } from "../db/sqlite";
 import type {
   ChatWidgetDefinition,
   WidgetActionDeps,

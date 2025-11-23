@@ -1,8 +1,10 @@
 import { pollWidget } from "./pollWidget";
 import { messageWidget } from "./messageWidget";
-import type { ChatWidgetDefinition } from "./types";
+import { checklistWidget } from "./checklistWidget";
+import type { AnyWidgetDefinition } from "./types";
 
-export const widgetRegistry: ChatWidgetDefinition[] = [
+export const widgetRegistry: AnyWidgetDefinition[] = [
   messageWidget,
   pollWidget,
+  checklistWidget,
 ];

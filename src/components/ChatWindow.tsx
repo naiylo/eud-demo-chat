@@ -1,5 +1,6 @@
 import type { Persona, Message } from "../db/sqlite";
 import { MessageList } from "./MessageList";
+import type { ChatWidgetDefinition, WidgetActionMap } from "../widgets/types";
 
 export function ChatWindow({
   personas,
@@ -8,6 +9,8 @@ export function ChatWindow({
   onOpenData,
   onClearMessages,
   onDeleteMessage,
+  widgets,
+  widgetActions,
 }: {
   personas: Persona[];
   messages: Message[];
@@ -17,6 +20,8 @@ export function ChatWindow({
   onOpenData?: () => void;
   onClearMessages?: () => void;
   onDeleteMessage?: (id: string) => void;
+  widgets: ChatWidgetDefinition[];
+  widgetActions: WidgetActionMap;
 }) {
   return (
     <section className="chat-window">
@@ -48,6 +53,8 @@ export function ChatWindow({
         personas={personas}
         currentActorId={selectedAuthorId}
         onDeleteMessage={onDeleteMessage}
+        widgets={widgets}
+        widgetActions={widgetActions}
       />
     </section>
   );

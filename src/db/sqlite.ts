@@ -25,13 +25,18 @@ export interface Persona {
   bio: string;
 }
 
+// Base message type. Widgets can register additional types dynamically, so keep this open.
+export type MessageType = "message" | string;
+
+export type MessageCustom = unknown;
+
 export interface Message {
   id: string;
   authorId: string;
   text: string;
   timestamp: string;
-  type: string;
-  custom: string[];
+  type: MessageType;
+  custom: MessageCustom;
 }
 
 export async function getDB(): Promise<Database> {
@@ -100,9 +105,17 @@ export async function getPersonas(): Promise<Persona[]> {
   }));
 }
 
-export async function getMessages(
-  authorId: string = "all"
-): Promise<Message[]> {
+function parseCustom(raw: string): MessageCustom {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed ?? [];
+  } catch (err) {
+    console.warn("Failed to parse custom message payload", err);
+    return [];
+  }
+}
+
+export async function getMessages(authorId: string = "all"): Promise<Message[]> {
   const db = await getDB();
   const sql =
     authorId === "all"
@@ -120,8 +133,8 @@ export async function getMessages(
       authorId: row.authorId as string,
       text: row.text as string,
       timestamp: row.timestamp as string,
-      type: row.type as string,
-      custom: JSON.parse(row.custom as string) as string[],
+      type: (row.type as MessageType) ?? "message",
+      custom: parseCustom(row.custom as string),
     });
   }
   stmt.free();

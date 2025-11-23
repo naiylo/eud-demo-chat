@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { Persona, Message } from "../db/sqlite";
 import { MessageBubble } from "./MessageBubble";
+import type { ChatWidgetDefinition, WidgetActionMap } from "../widgets/types";
 
 function useAutoScroll(deps: any[]) {
   const ref = useRef<HTMLDivElement>(null);
@@ -16,11 +17,15 @@ export function MessageList({
   personas,
   currentActorId,
   onDeleteMessage,
+  widgets,
+  widgetActions,
 }: {
   messages: Message[];
   personas: Persona[];
   currentActorId: string;
   onDeleteMessage?: (id: string) => void;
+  widgets: ChatWidgetDefinition[];
+  widgetActions: WidgetActionMap;
 }) {
   const ref = useAutoScroll([messages.length]);
   const byId = useMemo(
@@ -32,9 +37,17 @@ export function MessageList({
     [personas]
   );
 
+  const visibleMessages = useMemo(
+    () =>
+      messages.filter(
+        (m) => !widgets.some((w) => w.hideMessage?.(m))
+      ) as Message[],
+    [messages, widgets]
+  );
+
   return (
     <section className="message-stream" ref={ref}>
-      {messages.map((m) => (
+      {visibleMessages.map((m) => (
         <MessageBubble
           key={m.id}
           message={m}
@@ -42,9 +55,12 @@ export function MessageList({
           personas={personas}
           currentActorId={currentActorId}
           onDelete={onDeleteMessage}
+          allMessages={messages}
+          widgets={widgets}
+          widgetActions={widgetActions}
         />
       ))}
-      {messages.length === 0 && (
+      {visibleMessages.length === 0 && (
         <div className="empty-state">
           <h3>No messages yet.</h3>
           <p>Pick an author in the sidebar and send your first message.</p>

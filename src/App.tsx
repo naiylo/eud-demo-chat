@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   getPersonas,
   getMessages,
@@ -6,10 +6,15 @@ import {
   clearMessages,
   deleteMessage,
 } from "./db/sqlite";
-import type { Persona, Message } from "./db/sqlite";
+import type {
+  Persona,
+  Message,
+} from "./db/sqlite";
 import { PersonaSidebar } from "./components/PersonaSidebar";
 import { ChatWindow } from "./components/ChatWindow";
 import { DataPanel } from "./components/DataPanel";
+import { widgetRegistry } from "./widgets/registry";
+import type { WidgetActionMap } from "./widgets/types";
 
 import "./styles/styles.css";
 
@@ -34,12 +39,24 @@ export default function App() {
       authorId,
       text,
       timestamp: new Date().toISOString(),
-      type: "Message",
+      type: "message",
       custom: [],
     };
     await addMessage(msg);
     setMessages((cur) => [...cur, msg]);
   };
+
+  const widgetActions: WidgetActionMap = useMemo(() => {
+    const deps = {
+      addMessage,
+      deleteMessage,
+      setMessages,
+      getMessagesSnapshot: () => messages,
+    };
+    return Object.fromEntries(
+      widgetRegistry.map((w) => [w.type, w.createActions(deps)])
+    ) as WidgetActionMap;
+  }, [addMessage, deleteMessage, messages, setMessages]);
 
   const handleClearMessages = async () => {
     await clearMessages();
@@ -60,6 +77,8 @@ export default function App() {
             selectedId={selectedAuthorId}
             onSelect={setSelectedAuthorId}
             onSend={handleSend}
+            widgets={widgetRegistry}
+            widgetActions={widgetActions}
           />
         </div>
         <div className="layout__main">
@@ -72,6 +91,8 @@ export default function App() {
             onOpenData={() => setShowDataPanel(true)}
             onClearMessages={handleClearMessages}
             onDeleteMessage={handleDeleteMessage}
+            widgets={widgetRegistry}
+            widgetActions={widgetActions}
           />
           <DataPanel
             data={{ personas, messages }}

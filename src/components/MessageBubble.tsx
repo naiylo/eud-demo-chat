@@ -1,17 +1,40 @@
 import type { Persona, Message } from "../db/sqlite";
+import type { ChatWidgetDefinition, WidgetActionMap } from "../widgets/types";
 
 export function MessageBubble({
   message,
   persona,
+  personas,
+  currentActorId,
   onDelete,
+  allMessages,
+  widgets,
+  widgetActions,
 }: {
   message: Message;
   persona?: Persona;
-  currentActorId: string;
   personas: Persona[];
+  currentActorId: string;
   onDelete?: (id: string) => void;
+  allMessages: Message[];
+  widgets: ChatWidgetDefinition[];
+  widgetActions: WidgetActionMap;
 }) {
   if (!persona) return null;
+
+  const widget = widgets.find((w) => w.type === message.type);
+  const renderContent =
+    widget?.render
+      ? widget.render({
+          message,
+          personas,
+          allMessages,
+          currentActorId,
+          actions: widgetActions[widget.type],
+        })
+      : (
+        <p>{message.text}</p>
+      );
   return (
     <div className="message">
       <div
@@ -44,7 +67,7 @@ export function MessageBubble({
             </button>
           )}
         </header>
-        <p>{message.text}</p>
+        {renderContent}
       </div>
     </div>
   );

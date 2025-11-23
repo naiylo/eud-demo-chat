@@ -1,17 +1,22 @@
 import { useState } from "react";
 import type { Persona } from "../db/sqlite";
 import { WidgetWorkbench } from "./WidgetWorkbench";
+import type { ChatWidgetDefinition, WidgetActionMap } from "../widgets/types";
 
 export function PersonaSidebar({
   personas,
   selectedId,
   onSelect,
   onSend,
+  widgets,
+  widgetActions,
 }: {
   personas: Persona[];
   selectedId: string;
   onSelect: (id: string) => void;
   onSend: (text: string, authorId: string) => void;
+  widgets: ChatWidgetDefinition[];
+  widgetActions: WidgetActionMap;
 }) {
   const [showWorkbench, setShowWorkbench] = useState(false);
 
@@ -57,6 +62,8 @@ export function PersonaSidebar({
         open={showWorkbench}
         onClose={() => setShowWorkbench(false)}
         onSendMessage={onSend}
+        widgets={widgets}
+        widgetActions={widgetActions}
         selectedAuthorId={selectedId}
       />
     </>

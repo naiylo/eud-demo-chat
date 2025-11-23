@@ -50,3 +50,16 @@
   word-wrap: break-word;
 }
 
+.pill-toggle {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 10px;
+  box-shadow: none;
+}
+
+.pill-toggle--active {
+  background: rgba(122, 162, 255, 0.15);
+  border-color: var(--accent);
+}
+

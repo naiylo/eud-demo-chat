@@ -20,6 +20,7 @@ export function WidgetWorkbench({
   const [messageText, setMessageText] = useState("");
   const composerWidgets = widgets.filter((w) => w.composer);
   const [mode, setMode] = useState<string>("message");
+  const [removeNotice, setRemoveNotice] = useState<string>("");
 
   if (!open) return null;
 
@@ -36,6 +37,26 @@ export function WidgetWorkbench({
 
   const modalClass =
     "workbench-modal" + (mode === "addWidget" ? " workbench-modal--wide" : "");
+
+  const handleRemoveWidget = async (type: string, registryName?: string) => {
+    const target = registryName || type;
+    setRemoveNotice("");
+    try {
+      const res = await fetch(
+        `/api/widgets?name=${encodeURIComponent(target)}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Failed to delete widget");
+      }
+      setRemoveNotice(`Removed ${target}. Reload to see changes.`);
+      if (mode === type) setMode("message");
+    } catch (err) {
+      console.error(err);
+      setRemoveNotice("Could not remove widget. Ensure dev server is running.");
+    }
+  };
 
   return (
     <div className="data-modal-overlay" onClick={onClose}>
@@ -67,18 +88,34 @@ export function WidgetWorkbench({
               +
             </button>
             {composerWidgets.map((w) => (
-              <button
-                key={w.type}
-                type="button"
-                className={`pill-toggle ${
+              <div
+                className={`pill-toggle pill-toggle-group ${
                   mode === w.type ? "pill-toggle--active" : ""
                 }`}
-                onClick={() => setMode(w.type)}
+                key={w.type}
               >
-                {w.type}
-              </button>
+                <button
+                  type="button"
+                  className="pill-group__label"
+                  onClick={() => setMode(w.type)}
+                  aria-label={`Open ${w.type} composer`}
+                >
+                  {w.type}
+                </button>
+                <button
+                  type="button"
+                  className="pill-group__remove"
+                  aria-label={`Remove ${w.registryName || w.type} widget`}
+                  onClick={() => handleRemoveWidget(w.type, w.registryName)}
+                >
+                  ×
+                </button>
+              </div>
             ))}
           </div>
+          {removeNotice && (
+            <p className="workbench-helper">{removeNotice}</p>
+          )}
         </div>
 
         {mode === "addWidget" ? (

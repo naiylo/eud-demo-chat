@@ -28,6 +28,8 @@ export interface ChatWidgetDefinition<TActions = unknown> {
   createActions: (deps: WidgetActionDeps) => TActions;
   composer?: (props: WidgetComposerProps<TActions>) => ReactNode;
   hideMessage?: (message: Message) => boolean;
+  /** Optional: name used in registry/file management */
+  registryName?: string;
 }
 
 export type WidgetActionMap = Partial<Record<MessageType, unknown>>;

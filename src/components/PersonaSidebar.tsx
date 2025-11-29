@@ -7,14 +7,12 @@ export function PersonaSidebar({
   personas,
   selectedId,
   onSelect,
-  onSend,
   widgets,
   widgetActions,
 }: {
   personas: Persona[];
   selectedId: string;
   onSelect: (id: string) => void;
-  onSend: (text: string, authorId: string) => void;
   widgets: ChatWidgetDefinition[];
   widgetActions: WidgetActionMap;
 }) {
@@ -61,7 +59,6 @@ export function PersonaSidebar({
       <WidgetWorkbench
         open={showWorkbench}
         onClose={() => setShowWorkbench(false)}
-        onSendMessage={onSend}
         widgets={widgets}
         widgetActions={widgetActions}
         selectedAuthorId={selectedId}

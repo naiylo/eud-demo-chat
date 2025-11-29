@@ -71,7 +71,6 @@ export default function App() {
             personas={personas}
             selectedId={selectedAuthorId}
             onSelect={setSelectedAuthorId}
-            onSend={handleSend}
             widgets={widgetRegistry}
             widgetActions={widgetActions}
           />

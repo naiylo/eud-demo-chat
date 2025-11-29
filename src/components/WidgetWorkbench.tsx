@@ -5,32 +5,21 @@ import { AddWidget } from "./AddWidget";
 export function WidgetWorkbench({
   open,
   onClose,
-  onSendMessage,
   widgets,
   widgetActions,
   selectedAuthorId,
 }: {
   open: boolean;
   onClose: () => void;
-  onSendMessage: (text: string, authorId: string) => void;
   widgets: ChatWidgetDefinition[];
   widgetActions: WidgetActionMap;
   selectedAuthorId: string;
 }) {
-  const [messageText, setMessageText] = useState("");
   const composerWidgets = widgets.filter((w) => w.composer);
   const [mode, setMode] = useState<string>("message");
   const [removeNotice, setRemoveNotice] = useState<string>("");
 
   if (!open) return null;
-
-  const sendMessage = () => {
-    const trimmed = messageText.trim();
-    if (!trimmed) return;
-    onSendMessage(trimmed, selectedAuthorId);
-    setMessageText("");
-    onClose();
-  };
 
   const currentComposer =
     mode === "message" ? null : composerWidgets.find((w) => w.type === mode);

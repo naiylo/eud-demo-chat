@@ -2,6 +2,7 @@
 @import "./base.css";
 @import "./layout.css";
 @import "./sidebar.css";
+@import "./workbench.css";
 @import "./chat-window.css";
 @import "./message.css";
 @import "./data-panel.css";

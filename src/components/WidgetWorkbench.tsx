@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ChatWidgetDefinition, WidgetActionMap } from "../widgets/types";
+import { AddWidget } from "./AddWidget";
 
 export function WidgetWorkbench({
   open,
@@ -31,14 +32,15 @@ export function WidgetWorkbench({
   };
 
   const currentComposer =
-    mode === "message"
-      ? null
-      : composerWidgets.find((w) => w.type === mode);
+    mode === "message" ? null : composerWidgets.find((w) => w.type === mode);
+
+  const modalClass =
+    "workbench-modal" + (mode === "addWidget" ? " workbench-modal--wide" : "");
 
   return (
     <div className="data-modal-overlay" onClick={onClose}>
       <div
-        className="workbench-modal"
+        className={modalClass}
         role="dialog"
         aria-modal="true"
         aria-labelledby="workbench-modal-title"
@@ -57,16 +59,20 @@ export function WidgetWorkbench({
           <div className="pill-row" style={{ marginTop: 8 }}>
             <button
               type="button"
-              className={`pill-toggle ${mode === "message" ? "pill-toggle--active" : ""}`}
-              onClick={() => setMode("message")}
+              className={`pill-toggle ${
+                mode === "addWidget" ? "pill-toggle--active" : ""
+              }`}
+              onClick={() => setMode("addWidget")}
             >
-              Message
+              +
             </button>
             {composerWidgets.map((w) => (
               <button
                 key={w.type}
                 type="button"
-                className={`pill-toggle ${mode === w.type ? "pill-toggle--active" : ""}`}
+                className={`pill-toggle ${
+                  mode === w.type ? "pill-toggle--active" : ""
+                }`}
                 onClick={() => setMode(w.type)}
               >
                 {w.type}
@@ -75,33 +81,15 @@ export function WidgetWorkbench({
           </div>
         </div>
 
-        {mode === "message" ? (
-          <>
-            <textarea
-              className="workbench-editor"
-              placeholder="Type a message to send..."
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-            />
-            <div>
-              <button
-                type="button"
-                onClick={sendMessage}
-                disabled={!messageText.trim()}
-              >
-                Send Message
-              </button>
-            </div>
-          </>
-        ) : (
-          currentComposer?.composer ? (
-            currentComposer.composer({
-              actions: widgetActions[currentComposer.type],
-              authorId: selectedAuthorId,
-              onClose,
-            })
-          ) : null
-        )}
+        {mode === "addWidget" ? (
+          <AddWidget />
+        ) : currentComposer?.composer ? (
+          currentComposer.composer({
+            actions: widgetActions[currentComposer.type],
+            authorId: selectedAuthorId,
+            onClose,
+          })
+        ) : null}
       </div>
     </div>
   );

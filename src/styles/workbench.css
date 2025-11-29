@@ -64,9 +64,9 @@
 /* Add widget modal */
 .add-widget-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
   gap: var(--space-4);
-  min-height: 760px;
+  min-height: 660px;
 }
 
 .add-widget-pane {
@@ -98,7 +98,8 @@
   padding: var(--space-3);
   background: #1b2136;
   color: #f7fbff;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, ui-monospace, monospace;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
+    ui-monospace, monospace;
   resize: vertical;
 }
 

@@ -107,7 +107,7 @@ export function WidgetWorkbench({
         </div>
 
         {mode === "addWidget" ? (
-          <AddWidget />
+          <AddWidget widgets={widgets} />
         ) : currentComposer?.composer ? (
           currentComposer.composer({
             actions: widgetActions[currentComposer.type],

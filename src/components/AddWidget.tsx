@@ -1,18 +1,49 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { Message } from "../db/sqlite";
+import { useEffect, useMemo, useState } from "react";
+import type { ChatWidgetDefinition } from "../widgets/types";
 import { messageWidget } from "../widgets/builtins/messageWidget";
+import { pollWidget } from "../widgets/hidereadyWidgets/pollWidget";
+import { WidgetPreviewDemo } from "./WidgetPreviewDemo";
 
-export function AddWidget() {
+export function AddWidget({ widgets }: { widgets: ChatWidgetDefinition[] }) {
   const [code, setCode] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
     "idle"
   );
   const [message, setMessage] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewType, setPreviewType] = useState("message");
+  const [previewTypeEdited, setPreviewTypeEdited] = useState(false);
 
   const exportName = useMemo(() => {
     const match = code.match(/export const\s+(\w+)/);
     return match?.[1] ?? "customWidget";
   }, [code]);
+
+  const inferredWidgetType = useMemo(() => {
+    const match = code.match(/type:\s*["'`](\w+)["'`]/);
+    return match?.[1] ?? "message";
+  }, [code]);
+
+  useEffect(() => {
+    if (!previewTypeEdited) {
+      setPreviewType(inferredWidgetType);
+    }
+  }, [inferredWidgetType, previewTypeEdited]);
+
+  const knownWidgets = useMemo(() => {
+    const seen = new Set<string>();
+    const list = [messageWidget, pollWidget, ...widgets].filter((w) => {
+      if (seen.has(w.type)) return false;
+      seen.add(w.type);
+      return true;
+    });
+    return list;
+  }, [widgets]);
+
+  const matchedWidget = knownWidgets.find((w) => w.type === previewType);
+  const fallbackWidget =
+    knownWidgets.find((w) => w.type === inferredWidgetType) ?? messageWidget;
+  const previewWidget = matchedWidget ?? fallbackWidget;
 
   const handleSubmit = async () => {
     if (!code.trim()) return;
@@ -46,153 +77,88 @@ export function AddWidget() {
   };
 
   return (
-    <div className="add-widget-grid">
-      <section className="add-widget-pane">
-        <h4>Widget code</h4>
-        <textarea
-          className="add-widget-editor"
-          placeholder="Paste your entire widget file here (e.g. pollWidget)..."
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          spellCheck={false}
-        />
-        <div className="add-widget-footer">
-          <small>
-            {code.trim()
-              ? `${code.split(/\r?\n/).length} lines · export "${exportName}"`
-              : "Waiting for code..."}
-          </small>
+    <>
+      <div className="add-widget-grid">
+        <section className="add-widget-pane">
+          <h4>Widget code</h4>
+          <textarea
+            className="add-widget-editor"
+            placeholder="Paste your entire widget file here (e.g. pollWidget)..."
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            spellCheck={false}
+          />
+          <div className="add-widget-footer">
+            <small>
+              {code.trim()
+                ? `${code.split(/\r?\n/).length} lines - export "${exportName}"`
+                : "Waiting for code..."}
+            </small>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!code.trim() || status === "saving"}
+            >
+              {status === "saving" ? "Saving..." : "Submit widget"}
+            </button>
+          </div>
+          {message && (
+            <p
+              className={`add-widget-helper ${
+                status === "error" ? "add-widget-helper--error" : ""
+              }`}
+            >
+              {message}
+            </p>
+          )}
+        </section>
+        <section className="add-widget-pane add-widget-pane--preview">
+          <h4>Preview</h4>
+          <label className="add-widget-helper" style={{ display: "grid", gap: 6 }}>
+            Preview type (editable)
+            <input
+              type="text"
+              value={previewType}
+              onChange={(e) => {
+                setPreviewTypeEdited(true);
+                setPreviewType(e.target.value.trim());
+              }}
+              placeholder="e.g. createPoll"
+              className="add-widget-preview-input"
+            />
+            <small>
+              Inferred from code: <strong>{inferredWidgetType}</strong>
+              {matchedWidget
+                ? " · Found matching widget"
+                : " · Not registered yet, preview uses closest match"}
+            </small>
+          </label>
           <button
             type="button"
-            onClick={handleSubmit}
-            disabled={!code.trim() || status === "saving"}
+            className="widget-preview__play"
+            onClick={() => setPreviewOpen(true)}
           >
-            {status === "saving" ? "Saving..." : "Submit widget"}
+            Open sample demo
           </button>
-        </div>
-        {message && (
-          <p
-            className={`add-widget-helper ${
-              status === "error" ? "add-widget-helper--error" : ""
-            }`}
-          >
-            {message}
+          <p className="add-widget-helper" style={{ marginTop: 8 }}>
+            The demo opens a roomy modal and scales the widget down to fit while
+            keeping its styling intact.
           </p>
-        )}
-      </section>
-      <section className="add-widget-pane add-widget-pane--preview">
-        <h4>Preview</h4>
-        <WidgetPreviewSimulator />
-      </section>
-    </div>
-  );
-}
-
-type DemoStep = {
-  authorId: string;
-  text: string;
-};
-
-const DEMO_STREAM: DemoStep[] = [
-  {
-    authorId: "designer",
-    text: "Designer kicks off with a warm hello.",
-  },
-  {
-    authorId: "engineer",
-    text: "Engineer replies and acknowledges the brief.",
-  },
-  {
-    authorId: "pm",
-    text: "PM confirms the handoff and next steps.",
-  },
-];
-
-function WidgetPreviewSimulator() {
-  const [previewMessages, setPreviewMessages] = useState<Message[]>([]);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const timeoutRef = useRef<number[]>([]);
-  const messagesRef = useRef<Message[]>([]);
-
-  useEffect(() => {
-    messagesRef.current = previewMessages;
-  }, [previewMessages]);
-
-  const previewActions = useMemo(
-    () =>
-      messageWidget.createActions({
-        addMessage: async () => {},
-        deleteMessage: async () => {},
-        getMessagesSnapshot: () => messagesRef.current,
-        setMessages: setPreviewMessages,
-      }),
-    []
-  );
-
-  useEffect(() => {
-    return () => {
-      timeoutRef.current.forEach((id) => window.clearTimeout(id));
-    };
-  }, []);
-
-  const runDemo = () => {
-    if (isPlaying) return;
-    timeoutRef.current.forEach((id) => window.clearTimeout(id));
-    timeoutRef.current = [];
-    setPreviewMessages([]);
-    setIsPlaying(true);
-
-    DEMO_STREAM.forEach((step, index) => {
-      const handle = window.setTimeout(async () => {
-        await previewActions.sendMessage(step.text, step.authorId);
-        if (index === DEMO_STREAM.length - 1) {
-          setIsPlaying(false);
-        }
-      }, 400 + index * 900);
-      timeoutRef.current.push(handle);
-    });
-  };
-
-  return (
-    <div className="widget-preview">
-      <div className="widget-preview__controls">
-        <div>
-          <p className="widget-preview__label">
-            Step-by-step: messages flow through the widget actions.
-          </p>
-          <p className="widget-preview__hint">
-            Press play to see how <code>sendMessage</code> adds each entry.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={runDemo}
-          disabled={isPlaying}
-          className="widget-preview__play"
-        >
-          {isPlaying ? "Playing..." : "Play sample"}
-        </button>
+          {!matchedWidget && previewType && (
+            <p className="add-widget-helper" style={{ color: "var(--muted)" }}>
+              Widget type <strong>{previewType}</strong> is not registered in
+              this session. Submit and reload to preview its real styling.
+            </p>
+          )}
+        </section>
       </div>
-      <div className="widget-preview__screen" aria-live="polite">
-        {previewMessages.length === 0 ? (
-          <p className="widget-preview__placeholder">
-            A small feed will animate here.
-          </p>
-        ) : (
-          previewMessages.map((msg) => (
-            <div key={msg.id} className="widget-preview__message">
-              {messageWidget.render({
-                message: msg,
-                allMessages: previewMessages,
-                personas: [],
-                currentActorId: msg.authorId,
-                actions: previewActions,
-              })}
-              <span className="widget-preview__meta">{msg.authorId}</span>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
+
+      {previewOpen && (
+        <WidgetPreviewDemo
+          widget={previewWidget}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
+    </>
   );
 }

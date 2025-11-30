@@ -1,4 +1,4 @@
 import type { AnyWidgetDefinition } from "./types";
-import { messageWidget } from "./builtins/messageWidget";
+import { pollWidget } from "./pollWidget";
 
-export const widgetRegistry: AnyWidgetDefinition[] = [messageWidget];
+export const widgetRegistry: AnyWidgetDefinition[] = [pollWidget];

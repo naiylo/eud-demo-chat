@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ChatWidgetDefinition } from "../widgets/types";
-import { messageWidget } from "../widgets/builtins/messageWidget";
-import { pollWidget } from "../widgets/hidereadyWidgets/pollWidget";
 import { WidgetPreviewDemo } from "./WidgetPreviewDemo";
 
 export function AddWidget({ widgets }: { widgets: ChatWidgetDefinition[] }) {
@@ -11,7 +9,9 @@ export function AddWidget({ widgets }: { widgets: ChatWidgetDefinition[] }) {
   );
   const [message, setMessage] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewType, setPreviewType] = useState("message");
+  const [previewType, setPreviewType] = useState(
+    widgets[0]?.type ?? "message"
+  );
   const [previewTypeEdited, setPreviewTypeEdited] = useState(false);
 
   const exportName = useMemo(() => {
@@ -30,20 +30,25 @@ export function AddWidget({ widgets }: { widgets: ChatWidgetDefinition[] }) {
     }
   }, [inferredWidgetType, previewTypeEdited]);
 
+  useEffect(() => {
+    if (!widgets.length || previewTypeEdited) return;
+    setPreviewType(widgets[0]?.type ?? "message");
+  }, [widgets, previewTypeEdited]);
+
   const knownWidgets = useMemo(() => {
     const seen = new Set<string>();
-    const list = [messageWidget, pollWidget, ...widgets].filter((w) => {
-      if (seen.has(w.type)) return false;
-      seen.add(w.type);
+    return widgets.filter((w) => {
+      const key = w.registryName || w.type;
+      if (seen.has(key)) return false;
+      seen.add(key);
       return true;
     });
-    return list;
   }, [widgets]);
 
   const matchedWidget = knownWidgets.find((w) => w.type === previewType);
   const fallbackWidget =
-    knownWidgets.find((w) => w.type === inferredWidgetType) ?? messageWidget;
-  const previewWidget = matchedWidget ?? fallbackWidget;
+    knownWidgets.find((w) => w.type === inferredWidgetType) ?? knownWidgets[0];
+  const previewWidget = matchedWidget ?? fallbackWidget ?? knownWidgets[0];
 
   const handleSubmit = async () => {
     if (!code.trim()) return;
@@ -114,7 +119,10 @@ export function AddWidget({ widgets }: { widgets: ChatWidgetDefinition[] }) {
         </section>
         <section className="add-widget-pane add-widget-pane--preview">
           <h4>Preview</h4>
-          <label className="add-widget-helper" style={{ display: "grid", gap: 6 }}>
+          <label
+            className="add-widget-helper"
+            style={{ display: "grid", gap: 6 }}
+          >
             Preview type (editable)
             <input
               type="text"

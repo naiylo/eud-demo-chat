@@ -10,18 +10,11 @@ import type {
 export interface PollCustom {
   prompt: string;
   options: string[];
-  voteRevocable?: boolean;
-  allowMultiple?: boolean;
-  anonymous?: boolean;
 }
 
 export interface VoteCustom {
   pollId: string;
   optionIndex: number;
-}
-
-export interface DeleteVoteCustom {
-  pollId: string;
 }
 
 function isPollCustom(custom: unknown): custom is PollCustom {
@@ -44,18 +37,14 @@ function isVoteCustom(custom: unknown): custom is VoteCustom {
 
 type PollActions = {
   createPoll: (
-    poll: Pick<PollCustom, "prompt" | "options"> &
-      Partial<Omit<PollCustom, "prompt" | "options">>,
+    poll: Pick<PollCustom, "prompt" | "options">,
     authorId: string
   ) => Promise<void>;
   submitVote: (
     pollId: string,
     optionIndex: number,
-    authorId: string,
-    allowMultiple?: boolean,
-    voteRevocable?: boolean
+    authorId: string
   ) => Promise<void>;
-  retractVote: (pollId: string, authorId: string) => Promise<void>;
 };
 
 function createActions({
@@ -77,9 +66,6 @@ function createActions({
       custom: {
         prompt: poll.prompt.trim(),
         options: cleanOptions,
-        voteRevocable: poll.voteRevocable ?? true,
-        allowMultiple: poll.allowMultiple ?? false,
-        anonymous: poll.anonymous ?? false,
       },
     };
     await addMessage(msg);
@@ -89,9 +75,7 @@ function createActions({
   const submitVote: PollActions["submitVote"] = async (
     pollId,
     optionIndex,
-    authorId,
-    allowMultiple,
-    voteRevocable
+    authorId
   ) => {
     const now = new Date().toISOString();
     const castVote: Message = {
@@ -103,68 +87,32 @@ function createActions({
       custom: { pollId, optionIndex } satisfies VoteCustom,
     };
 
-    setMessages((cur) => {
-      let next = cur;
-      if (!allowMultiple) {
-        next = cur.filter(
-          (m) =>
-            !(
-              m.type === "vote" &&
-              (m.custom as VoteCustom)?.pollId === pollId &&
-              m.authorId === authorId
-            )
-        );
-      }
-
-      return [...next, castVote];
-    });
-
-    if (!allowMultiple || voteRevocable) {
-      const votesToDelete = getMessagesSnapshot().filter(
-        (m) =>
-          m.type === "vote" &&
-          (m.custom as VoteCustom)?.pollId === pollId &&
-          m.authorId === authorId &&
-          (m.custom as VoteCustom)?.optionIndex !== optionIndex
-      );
-      for (const vote of votesToDelete) {
-        await deleteMessage(vote.id);
-      }
-    }
-
-    await addMessage(castVote);
-  };
-
-  const retractVote: PollActions["retractVote"] = async (
-    pollId,
-    authorId
-  ) => {
     const votesToDelete = getMessagesSnapshot().filter(
       (m) =>
         m.type === "vote" &&
         (m.custom as VoteCustom)?.pollId === pollId &&
         m.authorId === authorId
     );
-
-    if (!votesToDelete.length) return;
-
     for (const vote of votesToDelete) {
       await deleteMessage(vote.id);
     }
 
     setMessages((cur) =>
-      cur.filter(
-        (m) =>
-          !(
-            m.type === "vote" &&
-            (m.custom as VoteCustom)?.pollId === pollId &&
-            m.authorId === authorId
-          )
-      )
+      cur
+        .filter(
+          (m) =>
+            !(
+              m.type === "vote" &&
+              (m.custom as VoteCustom)?.pollId === pollId &&
+              m.authorId === authorId
+            )
+        )
+        .concat(castVote)
     );
-  };
 
-  return { createPoll, submitVote, retractVote };
+    await addMessage(castVote);
+  };
+  return { createPoll, submitVote };
 }
 
 function PollComposer({
@@ -280,9 +228,6 @@ function PollView({
   );
 
   const options = message.custom.options;
-  const allowMultiple = !!message.custom.allowMultiple;
-  const voteRevocable = message.custom.voteRevocable ?? true;
-  const anonymous = message.custom.anonymous ?? false;
 
   const votes = allMessages.filter(
     (m) => m.type === "vote" && isVoteCustom(m.custom) && m.custom.pollId === message.id
@@ -294,25 +239,13 @@ function PollView({
 
   const handleVote = (optionIndex: number) => {
     if (!actions.submitVote) return;
-    if (myChoice.has(optionIndex)) return;
-    if (!allowMultiple && myVotes.length > 0 && !voteRevocable) return;
-    actions.submitVote(message.id, optionIndex, currentActorId, allowMultiple, voteRevocable);
-  };
-
-  const handleRetract = () => {
-    if (!actions.retractVote) return;
-    actions.retractVote(message.id, currentActorId);
+    actions.submitVote(message.id, optionIndex, currentActorId);
   };
 
   return (
     <div className="poll-card">
       <div className="poll-header">
         <p className="poll-question">{message.custom.prompt}</p>
-        <div className="pill-row">
-          {allowMultiple && <span className="pill">Multiple choice</span>}
-          {voteRevocable && <span className="pill">Votes revocable</span>}
-          {anonymous && <span className="pill">Anonymous</span>}
-        </div>
       </div>
       <div className="poll-options">
         {options.map((option, index) => {
@@ -330,7 +263,6 @@ function PollView({
               className={`poll-option ${checked ? "poll-option--selected" : ""}`}
               onClick={() => handleVote(index)}
               aria-pressed={checked}
-              disabled={!voteRevocable && myVotes.length > 0 && !checked && !allowMultiple}
             >
               <div className="poll-option__row">
                 <div className="poll-option__title">{option}</div>
@@ -344,7 +276,7 @@ function PollView({
               <div className="poll-option__progress">
                 <div style={{ width: `${percent}%` }} />
               </div>
-              {!anonymous && optionVotes.length > 0 && (
+              {optionVotes.length > 0 && (
                 <div className="poll-votees">
                   {optionVotes.map((vote) => {
                     const persona = personaLookup[vote.authorId];
@@ -366,13 +298,6 @@ function PollView({
           );
         })}
       </div>
-      {voteRevocable && myVotes.length > 0 && (
-        <div className="poll-actions">
-          <button type="button" onClick={handleRetract}>
-            Retract vote
-          </button>
-        </div>
-      )}
       <footer className="poll-footer">
         <small>{totalVotes} total vote{totalVotes === 1 ? "" : "s"}</small>
       </footer>

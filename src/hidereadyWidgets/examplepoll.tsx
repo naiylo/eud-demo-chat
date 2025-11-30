@@ -122,9 +122,6 @@ function PollComposer({
 }: WidgetComposerProps<PollActions>) {
   const [pollPrompt, setPollPrompt] = useState("");
   const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
-  const [pollAllowMultiple, setPollAllowMultiple] = useState(false);
-  const [pollAnonymous, setPollAnonymous] = useState(false);
-  const [pollRevocable, setPollRevocable] = useState(true);
 
   const updateOption = (index: number, value: string) => {
     setPollOptions((opts) => opts.map((o, i) => (i === index ? value : o)));
@@ -137,17 +134,11 @@ function PollComposer({
       {
         prompt: pollPrompt,
         options: cleanedOptions,
-        allowMultiple: pollAllowMultiple,
-        anonymous: pollAnonymous,
-        voteRevocable: pollRevocable,
       },
       authorId
     );
     setPollPrompt("");
     setPollOptions(["", ""]);
-    setPollAllowMultiple(false);
-    setPollAnonymous(false);
-    setPollRevocable(true);
     onClose();
   };
 
@@ -173,30 +164,6 @@ function PollComposer({
       >
         Add option
       </button>
-      <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <input
-          type="checkbox"
-          checked={pollAllowMultiple}
-          onChange={(e) => setPollAllowMultiple(e.target.checked)}
-        />
-        Allow multiple selections
-      </label>
-      <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <input
-          type="checkbox"
-          checked={pollAnonymous}
-          onChange={(e) => setPollAnonymous(e.target.checked)}
-        />
-        Anonymous votes
-      </label>
-      <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <input
-          type="checkbox"
-          checked={pollRevocable}
-          onChange={(e) => setPollRevocable(e.target.checked)}
-        />
-        Allow vote retraction
-      </label>
       <div>
         <button
           type="button"

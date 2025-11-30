@@ -21,8 +21,7 @@ export function WidgetWorkbench({
 
   if (!open) return null;
 
-  const currentComposer =
-    mode === "message" ? null : composerWidgets.find((w) => w.type === mode);
+  const currentComposer = composerWidgets.find((w) => w.type === mode);
 
   const modalClass =
     "workbench-modal" + (mode === "addWidget" ? " workbench-modal--wide" : "");

@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import type { Message, Persona } from "../../db/sqlite";
+import type { Message, Persona } from "../db/sqlite";
 import type {
   ChatWidgetDefinition,
   WidgetActionDeps,
   WidgetComposerProps,
   WidgetRenderProps,
-} from "../types";
+} from "../widgets/types";
 
 export interface PollCustom {
   prompt: string;

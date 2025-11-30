@@ -5,7 +5,7 @@ import type {
   WidgetActionDeps,
   WidgetComposerProps,
   WidgetRenderProps,
-} from "./types";
+} from "../widgets/types";
 
 export interface ChecklistCustom {
   title: string;

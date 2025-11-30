@@ -1,11 +1,11 @@
 import { useState } from "react";
-import type { Message } from "../../db/sqlite";
+import type { Message } from "../db/sqlite";
 import type {
   ChatWidgetDefinition,
   WidgetActionDeps,
   WidgetComposerProps,
   WidgetRenderProps,
-} from "../types";
+} from "../widgets/types";
 
 type MessageActions = {
   sendMessage: (text: string, authorId: string) => Promise<void>;

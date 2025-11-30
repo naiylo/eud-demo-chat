@@ -80,7 +80,7 @@ export function WidgetWorkbench({
                 className={`pill-toggle pill-toggle-group ${
                   mode === w.type ? "pill-toggle--active" : ""
                 }`}
-                key={w.type}
+                key={w.registryName || w.type}
               >
                 <button
                   type="button"

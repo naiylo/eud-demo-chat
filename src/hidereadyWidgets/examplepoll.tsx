@@ -274,6 +274,7 @@ function PollView({
 
 export const pollWidget: ChatWidgetDefinition<PollActions> = {
   type: "createPoll",
+  registryName: "examplepoll",
   render: (props) => <PollView {...props} />,
   createActions,
   composer: (props) => <PollComposer {...props} />,

@@ -203,6 +203,7 @@ function ChecklistView({
 
 export const checklistWidget: ChatWidgetDefinition<ChecklistActions> = {
   type: "checklist",
+  registryName: "examplechecklist",
   render: (props) => <ChecklistView {...props} />,
   createActions,
   composer: (props) => <ChecklistComposer {...props} />,
@@ -218,7 +219,10 @@ const checklistStyles = `
 .checklist-items label { display: flex; gap: 10px; align-items: center; cursor: pointer; }
 `;
 
-if (typeof document !== "undefined" && !document.getElementById("checklist-widget-styles")) {
+if (
+  typeof document !== "undefined" &&
+  !document.getElementById("checklist-widget-styles")
+) {
   const tag = document.createElement("style");
   tag.id = "checklist-widget-styles";
   tag.textContent = checklistStyles;

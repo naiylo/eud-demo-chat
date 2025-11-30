@@ -75,6 +75,7 @@ function MessageComposer({
 
 export const messageWidget: ChatWidgetDefinition<MessageActions> = {
   type: "message",
+  registryName: "examplemessage",
   render: (props) => <MessageView {...props} />,
   createActions,
   composer: (props) => <MessageComposer {...props} />,

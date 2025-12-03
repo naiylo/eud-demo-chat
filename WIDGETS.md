@@ -1,14 +1,14 @@
 # Widgets: How to add a new one
 
-The chat supports pluggable widgets. Each widget lives in **one file** under `src/widgets/` and registers itself through `src/widgets/registry.ts`. A widget file owns:
+The chat supports pluggable widgets. Each widget lives in **one file** under `src/widgets/` and registers itself through `src/widgets/registry.ts`. Think of a widget as a tiny class with clearly separated elements:
 - Its message type(s) and custom payload interfaces
 - Its create/toggle/send actions
-- Its React render function
-- Its optional composer UI for the workbench
+- Its `elements.render` (how a row is painted)
+- Its optional `elements.composer` (UI shown in the workbench)
 - Its own injected styles (keeps global CSS clean)
 
 ## Quick steps
-1) Create `src/widgets/<yourWidget>.tsx` that exports a `ChatWidgetDefinition`.
+1) Create `src/widgets/<yourWidget>.tsx` that exports a `ChatWidgetDefinition` with an `elements` block.
 2) Add the widget to `widgetRegistry` in `src/widgets/registry.ts`.
 3) Done. The app will render your widget messages, hide any helper/system messages you mark, and expose your composer in the workbench.
 
@@ -36,13 +36,16 @@ function MyComposer({ actions, authorId, onClose }: WidgetComposerProps<MyAction
 // 5) Render: how a message of this widget type is displayed
 function MyView(props: WidgetRenderProps<MyActions>) { /* ... */ }
 
-// 6) Export the definition
+// 6) Export the definition with elements
 export const myWidget: ChatWidgetDefinition<MyActions> = {
   type: "<yourMessageType>",
-  render: (props) => <MyView {...props} />,
   createActions,
-  composer: (props) => <MyComposer {...props} />, // optional
+  elements: {
+    render: (props) => <MyView {...props} />,
+    composer: (props) => <MyComposer {...props} />, // optional
+  },
   hideMessage: (message) => /* return true for helper/system rows to hide */,
+  registryName: "<optional-registry-name>",
 };
 
 // 7) (Optional) Inject styles so the widget is self-contained
@@ -66,4 +69,3 @@ export const widgetRegistry = [myWidget /*, other widgets */];
 - `MessageType` in the DB is open (`"message" | string`), so widgets can introduce new types without touching the DB schema.
 - If your widget emits helper/system messages (like votes or updates), use `hideMessage` to keep them out of the main stream.
 - Keep all widget styling in the widget file to avoid leaking CSS across widgets.
-```

@@ -22,11 +22,21 @@ export type WidgetComposerProps<TActions> = {
   onClose: () => void;
 };
 
+export type WidgetElements<TActions> = {
+  /**
+   * How a widget paints a message row.
+   */
+  render: (props: WidgetRenderProps<TActions>) => ReactNode;
+  /**
+   * Optional: a composer shown in the workbench to create/send messages.
+   */
+  composer?: (props: WidgetComposerProps<TActions>) => ReactNode;
+};
+
 export interface ChatWidgetDefinition<TActions = unknown> {
   type: MessageType;
-  render: (props: WidgetRenderProps<TActions>) => ReactNode;
+  elements: WidgetElements<TActions>;
   createActions: (deps: WidgetActionDeps) => TActions;
-  composer?: (props: WidgetComposerProps<TActions>) => ReactNode;
   hideMessage?: (message: Message) => boolean;
   /** Optional: name used in registry/file management */
   registryName?: string;

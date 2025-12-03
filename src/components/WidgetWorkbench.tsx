@@ -15,7 +15,9 @@ export function WidgetWorkbench({
   widgetActions: WidgetActionMap;
   selectedAuthorId: string;
 }) {
-  const composerWidgets = widgets.filter((w) => w.composer);
+  const composerWidgets = widgets.filter(
+    (w) => w.elements?.composer ?? (w as any)?.composer
+  );
   const [mode, setMode] = useState<string>("message");
   const [removeNotice, setRemoveNotice] = useState<string>("");
 
@@ -108,8 +110,15 @@ export function WidgetWorkbench({
 
         {mode === "addWidget" ? (
           <AddWidget widgets={widgets} />
-        ) : currentComposer?.composer ? (
-          currentComposer.composer({
+        ) : currentComposer?.elements?.composer ? (
+          currentComposer.elements.composer({
+            actions: widgetActions[currentComposer.type],
+            authorId: selectedAuthorId,
+            onClose,
+          })
+        ) : (currentComposer as any)?.composer ? (
+          // Legacy widgets might still export composer at the top level.
+          (currentComposer as any).composer({
             actions: widgetActions[currentComposer.type],
             authorId: selectedAuthorId,
             onClose,

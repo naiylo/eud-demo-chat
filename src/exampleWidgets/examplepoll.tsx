@@ -211,7 +211,7 @@ function PollView({
 
   const options = message.custom.options;
   const votes = allMessages.filter(
-    (m) =>
+    (m): m is Message & { custom: VoteCustom } =>
       m.type === "vote" &&
       isVoteCustom(m.custom) &&
       m.custom.pollId === message.id
@@ -241,7 +241,7 @@ function PollView({
       <div className="poll-options">
         {options.map((option) => {
           const optionVotes = votes.filter(
-            (v) => (v.custom as VoteCustom).optionId === option.id
+            (v) => v.custom.optionId === option.id
           );
           const percent = totalVotes
             ? Math.round((optionVotes.length / totalVotes) * 100)

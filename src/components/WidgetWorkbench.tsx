@@ -28,6 +28,20 @@ export function WidgetWorkbench({
   const modalClass =
     "workbench-modal" + (mode === "addWidget" ? " workbench-modal--wide" : "");
 
+  const renderComposer = () => {
+    if (mode === "addWidget") {
+      return <AddWidget widgets={widgets} />;
+    }
+    if (!currentComposer) return null;
+
+    if (!currentComposer.elements?.composer) return null;
+    return currentComposer.elements.composer({
+      actions: widgetActions[currentComposer.type],
+      authorId: selectedAuthorId,
+      onClose,
+    });
+  };
+
   const handleRemoveWidget = async (type: string, registryName?: string) => {
     const target = registryName || type;
     setRemoveNotice("");
@@ -108,22 +122,7 @@ export function WidgetWorkbench({
           )}
         </div>
 
-        {mode === "addWidget" ? (
-          <AddWidget widgets={widgets} />
-        ) : currentComposer?.elements?.composer ? (
-          currentComposer.elements.composer({
-            actions: widgetActions[currentComposer.type],
-            authorId: selectedAuthorId,
-            onClose,
-          })
-        ) : (currentComposer as any)?.composer ? (
-          // Legacy widgets might still export composer at the top level.
-          (currentComposer as any).composer({
-            actions: widgetActions[currentComposer.type],
-            authorId: selectedAuthorId,
-            onClose,
-          })
-        ) : null}
+        {renderComposer()}
       </div>
     </div>
   );

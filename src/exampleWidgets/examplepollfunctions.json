@@ -1,22 +1,4 @@
 {
-  "widget": {
-    "class": "PollWidget",
-    "elements": {
-      "poll": {
-        "id": "poll-1764753788644",
-        "prompt": "Testpoll",
-        "options": [
-          { "id": "opt-0-testpoll", "label": "A", "votes": ["engineer", "designer"] },
-          { "id": "opt-1-testpoll", "label": "B", "votes": ["pm"] }
-        ]
-      },
-      "votes": [
-        { "id": "vote-1764753790072", "authorId": "engineer", "optionId": "opt-0-testpoll" },
-        { "id": "vote-1764753792336", "authorId": "designer", "optionId": "opt-0-testpoll" },
-        { "id": "vote-1764753794394", "authorId": "pm", "optionId": "opt-1-testpoll" }
-      ]
-    }
-  },
   "messages": [
     {
       "id": "poll-1764753788644",

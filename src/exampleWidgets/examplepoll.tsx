@@ -297,6 +297,132 @@ function PollView({
   );
 }
 
+const pollWidgetStyles = `
+.poll-card {
+  background: linear-gradient(180deg, #121831 0%, #0c1224 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 24px;
+  padding: 16px;
+  box-shadow: 0 18px 46px rgba(2, 6, 20, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.poll-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.poll-question {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.poll-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.poll-option {
+  width: 100%;
+  text-align: left;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 12px 14px;
+  box-shadow: none;
+}
+
+.poll-option--selected {
+  border-color: #7aa2ff;
+  background: rgba(122, 162, 255, 0.12);
+}
+
+.poll-option__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.poll-option__title {
+  font-weight: 600;
+}
+
+.poll-option__meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  color: #9aa9c6;
+}
+
+.poll-option__meta .pill {
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.poll-option__progress {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.poll-option__progress > div {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7aa2ff, #5af3ff);
+  transition: width 200ms ease;
+}
+
+.poll-votees {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.poll-votees__avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #050914;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.16);
+}
+
+.poll-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 12px;
+  font-size: 12px;
+  color: #9aa9c6;
+  min-height: 14px;
+}
+`;
+
+if (
+  typeof document !== "undefined" &&
+  !document.getElementById("poll-widget-styles")
+) {
+  const style = document.createElement("style");
+  style.id = "poll-widget-styles";
+  style.textContent = pollWidgetStyles;
+  document.head.appendChild(style);
+}
+
 export const examplepoll: ChatWidgetDefinition<PollActions> = {
   type: "createPoll",
   registryName: "examplepoll",

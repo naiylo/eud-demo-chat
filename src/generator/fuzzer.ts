@@ -6,6 +6,18 @@ export interface FuzzOptions {
     maxLength?: number;
 }
 
+export interface Constraint {
+    name: string;
+    description: string;
+    validation: (stream: Message[]) => boolean;
+}
+
+export interface Action {
+    name: string;
+    description: string;
+    preconditions: Constraint[];
+}
+
 const DEFAULT_OPTIONS: Required<FuzzOptions> = {
     population: 30,
     generations: 30,
@@ -20,9 +32,9 @@ function nowIso(offsetMs = 0) {
 
 const polls: string[] = [];
 
-// reference: use a id referring to a poll in 50% of cases
+// reference: use an id referring to a poll
 function makeId(prefix: string, reference = false): string {
-    if (reference && Math.random() < 0.5) {
+    if (reference) {
         return polls[Math.floor(Math.random() * polls.length)];
     }
     return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
@@ -90,53 +102,19 @@ function cloneMessageStream(stream: Message[]): Message[] {
 }
 
 // Heuristic scoring: reward "interesting" or "dangerous" patterns
-function fitness(stream: Message[]): number {
+function fitness(stream: Message[], actions: Action[]): number {
     let score = 0;
-    const polls: Record<string, { options?: string[]; createdAt: number }> = {};
-    const votesByAuthorForPoll = new Map<string, Set<string>>();
 
-    for (let i = 0; i < stream.length; i++) {
-        const m = stream[i];
-        if (m.type === "createPoll") {
-            const pid = (m.id ?? "").toString();
-            const custom = m.custom as Record<string, unknown> | undefined;
-            const optsArr = Array.isArray(custom?.options) ? (custom?.options as unknown[]) : undefined;
-            polls[pid] = { options: optsArr as string[] | undefined, createdAt: i };
-            // malformed createPoll is interesting
-            if (!custom || typeof custom.prompt !== "string" || !optsArr) 
-                score += 2;
-        }
-        if (m.type === "vote") {
-            const c = m.custom as Record<string, unknown> | undefined;
-            const pollId = typeof c?.pollId === "string" ? (c.pollId as string) : undefined;
-            const optionIndex = typeof c?.optionIndex === "number" ? (c.optionIndex as number) : undefined;
-            if (!pollId || !polls[pollId] || polls[pollId].createdAt >= i) {
-                // vote before poll created or referencing missing poll -> interesting
-                score += 6;
+    for (const action of actions) {
+        action.preconditions.forEach((constraint) => {
+            if (!constraint.validation(stream)) {
+                score -= 10;
             } else {
-                score += 5; // normal vote
-                const opts = polls[pollId].options;
-                if (opts && typeof optionIndex === "number" && optionIndex >= opts.length) 
-                    score += 4; // invalid option index
+                score += 5;
             }
-            // duplicate votes by same author for same poll
-            if (!votesByAuthorForPoll.has(m.authorId)) {
-                votesByAuthorForPoll.set(m.authorId, new Set<string>());
-            }
-
-            const votes = votesByAuthorForPoll.get(m.authorId)!;
-
-            if (pollId && votes.has(pollId)) {
-                score += 3;
-            } else if (pollId) {
-                votes.add(pollId); 
-            }
-        }
-        // malformed/unknown types
-        if (m.type && typeof m.type === "string" && m.type !== "message" && m.type !== "vote" && m.type !== "createPoll") {
-            score += 1;
-        }
+        });
     }
+
     return score;
 }
 
@@ -234,7 +212,7 @@ function crossover(a: Message[], b: Message[]): Message[] {
     return child;
 }
 
-export function generatePollMessageStream(options?: FuzzOptions): Message[] {
+export function generatePollMessageStream(actions: Action[], options?: FuzzOptions): Message[] {
     const opts = { ...DEFAULT_OPTIONS, ...(options ?? {}) } as Required<FuzzOptions>;
 
     // initialize population
@@ -243,11 +221,11 @@ export function generatePollMessageStream(options?: FuzzOptions): Message[] {
         population.push(randomInitial(opts.maxLength));
 
     let best: Message[] = population[0];
-    let bestScore = fitness(best);
+    let bestScore = fitness(best, actions);
 
     for (let gen = 0; gen < opts.generations; gen++) {
         // score all
-        const scored = population.map((individual) => ({ individual: individual, score: fitness(individual) }));
+        const scored = population.map((individual) => ({ individual: individual, score: fitness(individual, actions) }));
         scored.sort((a, b) => b.score - a.score);
         
         if (scored[0].score > bestScore) {
@@ -287,4 +265,4 @@ export function generatePollMessageStream(options?: FuzzOptions): Message[] {
     return out;
 }
 
-console.log(generatePollMessageStream({ population: 10, generations: 15, maxLength: 30 }));
+console.log(generatePollMessageStream([], { population: 10, generations: 15, maxLength: 30 }));

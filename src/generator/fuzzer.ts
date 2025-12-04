@@ -1,4 +1,5 @@
 import type { Message } from "../db/sqlite";
+import { checkPostAddVote, checkPreAddVote, type VoteCustom } from "../exampleWidgets/examplepoll";
 
 export interface FuzzOptions {
     population?: number;
@@ -6,16 +7,33 @@ export interface FuzzOptions {
     maxLength?: number;
 }
 
+type PreConditionInput = {
+    stream: Message[];
+    authorId: string;
+    pollId: string;
+}
+
+type PostConditionInput = {
+    prevMessages: Message[];
+    nextMessages: Message[];
+    authorId: string;
+    pollId: string;
+}
+
+function isPreConditionInput(input: PreConditionInput | PostConditionInput): input is PreConditionInput {
+  return (input as PreConditionInput).stream !== undefined;
+}
 export interface Constraint {
     name: string;
     description: string;
-    validation: (stream: Message[]) => boolean;
+    validate: (input: PreConditionInput | PostConditionInput) => boolean;
 }
 
 export interface Action {
     name: string;
     description: string;
-    preconditions: Constraint[];
+    preConditions: Constraint[];
+    postConditions: Constraint[];
 }
 
 const DEFAULT_OPTIONS: Required<FuzzOptions> = {
@@ -105,16 +123,31 @@ function cloneMessageStream(stream: Message[]): Message[] {
 function fitness(stream: Message[], actions: Action[]): number {
     let score = 0;
 
-    for (const action of actions) {
-        action.preconditions.forEach((constraint) => {
-            if (!constraint.validation(stream)) {
-                score -= 10;
-            } else {
-                score += 5;
-            }
-        });
-    }
+    for(let i = 0; i < stream.length; i++) {
+        const msg = stream[i];
+        const action = actions.find((a) => a.name === msg.type);
+        if (action) {
+            score += 2; // base score for recognized action
+        }
 
+        const authorId = msg.authorId;
+        const pollId: string | null = msg.type === "createPoll" ? msg.id : msg.type === "vote" ? (msg.custom as VoteCustom).pollId : null;
+
+        if (pollId) {
+           action?.preConditions.forEach((constraint) => {
+                if (constraint.validate({ stream: stream.slice(0, i - 1), authorId, pollId })) {
+                    score += 3;
+                }
+            });
+
+            action?.postConditions.forEach((constraint) => {
+                if (constraint.validate({ prevMessages: stream.slice(0, i - 1), nextMessages: stream.slice(i), authorId, pollId })) {
+                    score += 3;
+                }
+            });
+        }
+    }
+    
     return score;
 }
 
@@ -265,4 +298,42 @@ export function generatePollMessageStream(actions: Action[], options?: FuzzOptio
     return out;
 }
 
-console.log(generatePollMessageStream([], { population: 10, generations: 15, maxLength: 30 }));
+console.log(generatePollMessageStream([
+    {
+        name: "createPoll",
+        description: "Creating a poll",
+        preConditions: [],
+        postConditions: [],
+    },
+    {
+        name: "addVote",
+        description: "Voting in a poll",
+        preConditions: [ 
+            {
+                name: "Poll exists",
+                description: "The poll being voted on must exist in the message stream",
+                validate: (input: PreConditionInput | PostConditionInput) => {
+                    if (isPreConditionInput(input)) {
+                        const { stream, pollId, authorId } = input as PreConditionInput;
+                        return checkPreAddVote(stream, pollId, authorId);
+                    }
+                    return false;
+                }
+            }
+        ],
+        postConditions: [
+            {
+                name: "Vote counted",
+                description: "After voting, the vote should be counted in the poll results",
+                validate: (input: PreConditionInput | PostConditionInput) => {
+                    if (!isPreConditionInput(input)) {
+                        const { prevMessages, nextMessages, pollId, authorId } = input as PostConditionInput;
+                        return checkPostAddVote(prevMessages, nextMessages, pollId, authorId);
+                    }
+                    return false;
+                }
+            }
+        ],
+    }
+],
+{ population: 10, generations: 15, maxLength: 30 }));

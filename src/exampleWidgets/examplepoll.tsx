@@ -423,6 +423,57 @@ if (
   document.head.appendChild(style);
 }
 
+// Get all vote messages for author
+const getVotesForAuthor = (
+  messages: Message[],
+  pollId: string,
+  authorId: string
+): Array<Message & { custom: VoteCustom }> =>
+  messages.filter(
+    (m): m is Message & { custom: VoteCustom } =>
+      m.type === "vote" &&
+      isVoteCustom(m.custom) &&
+      m.custom.pollId === pollId &&
+      m.authorId === authorId
+  );
+
+// Check if there is a vote on the poll already
+// Is basically also checkPostAddVote as the Pre expects false (no vote) and post expects true (a vote)
+export const checkPreAddVote = (
+  messages: Message[],
+  pollId: string,
+  authorId: string
+): boolean => getVotesForAuthor(messages, pollId, authorId).length === 0;
+
+export const checkPostAddVote = (
+  prevMessages: Message[],
+  nextMessages: Message[],
+  pollId: string,
+  authorId: string
+): boolean => {
+  const prevVotes = getVotesForAuthor(prevMessages, pollId, authorId).length;
+  const nextVotes = getVotesForAuthor(nextMessages, pollId, authorId).length;
+  return prevVotes === 0 && nextVotes === 1;
+};
+
+// Pre there needs to be at least one vote from the author on the poll to delete
+export const checkPreDeleteVote = (
+  messages: Message[],
+  pollId: string,
+  authorId: string
+): boolean => getVotesForAuthor(messages, pollId, authorId).length > 0;
+
+export const checkPostDeleteVote = (
+  prevMessages: Message[],
+  nextMessages: Message[],
+  pollId: string,
+  authorId: string
+): boolean => {
+  const prevVotes = getVotesForAuthor(prevMessages, pollId, authorId).length;
+  const nextVotes = getVotesForAuthor(nextMessages, pollId, authorId).length;
+  return prevVotes > 0 && nextVotes === 0;
+};
+
 export const examplepoll: ChatWidgetDefinition<PollActions> = {
   type: "createPoll",
   registryName: "examplepoll",

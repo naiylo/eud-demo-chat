@@ -23,18 +23,19 @@ export function MessageBubble({
   if (!persona) return null;
 
   const widget = widgets.find((w) => w.type === message.type);
-  const renderContent =
-    widget?.render
-      ? widget.render({
-          message,
-          personas,
-          allMessages,
-          currentActorId,
-          actions: widgetActions[widget.type],
-        })
-      : (
-        <p>{message.text}</p>
-      );
+  const renderer =
+    widget?.elements.render ?? (widget as any)?.render ?? null;
+  const renderContent = renderer ? (
+    renderer({
+      message,
+      personas,
+      allMessages,
+      currentActorId,
+      actions: widgetActions[widget?.type ?? message.type],
+    })
+  ) : (
+    <p>{message.text}</p>
+  );
   return (
     <div className="message">
       <div

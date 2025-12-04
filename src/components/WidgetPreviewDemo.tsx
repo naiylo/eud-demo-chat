@@ -39,29 +39,29 @@ const SAMPLE_STREAMS: Record<string, Message[]> = {
     {
       id: "poll-1764507520662",
       authorId: "engineer",
-      text: "TestPoll 1",
+      text: "Product direction",
       timestamp: "2025-11-30T12:58:40.662Z",
       type: "createPoll",
       custom: {
-        prompt: "TestPoll 1",
-        options: ["A", "B"],
-        voteRevocable: true,
-        allowMultiple: true,
-        anonymous: true,
+        prompt: "Product direction",
+        options: [
+          { id: "opt-preview-a", label: "Ship MVP" },
+          { id: "opt-preview-b", label: "Polish for two more weeks" },
+        ],
       },
     },
     {
       id: "poll-1764507529387",
       authorId: "engineer",
-      text: "TestPoll 2",
+      text: "Frontend stack",
       timestamp: "2025-11-30T12:58:49.387Z",
       type: "createPoll",
       custom: {
-        prompt: "TestPoll 2",
-        options: ["B", "C"],
-        voteRevocable: true,
-        allowMultiple: false,
-        anonymous: false,
+        prompt: "Frontend stack",
+        options: [
+          { id: "opt-preview-c", label: "Stay with React" },
+          { id: "opt-preview-d", label: "Try a lighter UI lib" },
+        ],
       },
     },
     {
@@ -70,7 +70,7 @@ const SAMPLE_STREAMS: Record<string, Message[]> = {
       text: "",
       timestamp: "2025-11-30T12:58:57.425Z",
       type: "vote",
-      custom: { pollId: "poll-1764507520662", optionIndex: 0 },
+      custom: { pollId: "poll-1764507520662", optionId: "opt-preview-a" },
     },
     {
       id: "vote-1764507538116",
@@ -78,7 +78,7 @@ const SAMPLE_STREAMS: Record<string, Message[]> = {
       text: "",
       timestamp: "2025-11-30T12:58:58.116Z",
       type: "vote",
-      custom: { pollId: "poll-1764507529387", optionIndex: 1 },
+      custom: { pollId: "poll-1764507529387", optionId: "opt-preview-d" },
     },
     {
       id: "vote-1764507539453",
@@ -86,7 +86,7 @@ const SAMPLE_STREAMS: Record<string, Message[]> = {
       text: "",
       timestamp: "2025-11-30T12:58:59.453Z",
       type: "vote",
-      custom: { pollId: "poll-1764507520662", optionIndex: 1 },
+      custom: { pollId: "poll-1764507520662", optionId: "opt-preview-b" },
     },
     {
       id: "vote-1764507540057",
@@ -94,7 +94,7 @@ const SAMPLE_STREAMS: Record<string, Message[]> = {
       text: "",
       timestamp: "2025-11-30T12:59:00.057Z",
       type: "vote",
-      custom: { pollId: "poll-1764507529387", optionIndex: 0 },
+      custom: { pollId: "poll-1764507529387", optionId: "opt-preview-c" },
     },
     {
       id: "vote-1764507541499",
@@ -102,7 +102,7 @@ const SAMPLE_STREAMS: Record<string, Message[]> = {
       text: "",
       timestamp: "2025-11-30T12:59:01.499Z",
       type: "vote",
-      custom: { pollId: "poll-1764507520662", optionIndex: 0 },
+      custom: { pollId: "poll-1764507520662", optionId: "opt-preview-a" },
     },
     {
       id: "vote-1764507544073",
@@ -110,7 +110,7 @@ const SAMPLE_STREAMS: Record<string, Message[]> = {
       text: "",
       timestamp: "2025-11-30T12:59:04.073Z",
       type: "vote",
-      custom: { pollId: "poll-1764507529387", optionIndex: 0 },
+      custom: { pollId: "poll-1764507529387", optionId: "opt-preview-c" },
     },
   ],
 };
@@ -221,21 +221,31 @@ export function WidgetPreviewDemo({
           ) : (
             previewMessages
               .filter((msg) => !(widget.hideMessage?.(msg) ?? false))
-              .map((msg) => (
-                <div
-                  key={msg.id}
-                  className="widget-preview__message widget-preview__message--modal"
-                >
-                  {widget.render({
-                    message: msg,
-                    allMessages: previewMessages,
-                    personas: PREVIEW_PERSONAS,
-                    currentActorId: msg.authorId,
-                    actions: previewActions,
-                  })}
-                  <span className="widget-preview__meta">{msg.authorId}</span>
-                </div>
-              ))
+              .map((msg) => {
+                const renderer =
+                  widget.elements?.render ?? (widget as any)?.render;
+                return (
+                  <div
+                    key={msg.id}
+                    className="widget-preview__message widget-preview__message--modal"
+                  >
+                    {renderer ? (
+                      renderer({
+                        message: msg,
+                        allMessages: previewMessages,
+                        personas: PREVIEW_PERSONAS,
+                        currentActorId: msg.authorId,
+                        actions: previewActions,
+                      })
+                    ) : (
+                      <p>Widget does not expose a renderer.</p>
+                    )}
+                    <span className="widget-preview__meta">
+                      {msg.authorId}
+                    </span>
+                  </div>
+                );
+              })
           )}
         </div>
       </div>

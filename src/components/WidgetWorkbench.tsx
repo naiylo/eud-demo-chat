@@ -15,7 +15,9 @@ export function WidgetWorkbench({
   widgetActions: WidgetActionMap;
   selectedAuthorId: string;
 }) {
-  const composerWidgets = widgets.filter((w) => w.composer);
+  const composerWidgets = widgets.filter(
+    (w) => w.elements?.composer ?? (w as any)?.composer
+  );
   const [mode, setMode] = useState<string>("message");
   const [removeNotice, setRemoveNotice] = useState<string>("");
 
@@ -25,6 +27,20 @@ export function WidgetWorkbench({
 
   const modalClass =
     "workbench-modal" + (mode === "addWidget" ? " workbench-modal--wide" : "");
+
+  const renderComposer = () => {
+    if (mode === "addWidget") {
+      return <AddWidget widgets={widgets} />;
+    }
+    if (!currentComposer) return null;
+
+    if (!currentComposer.elements?.composer) return null;
+    return currentComposer.elements.composer({
+      actions: widgetActions[currentComposer.type],
+      authorId: selectedAuthorId,
+      onClose,
+    });
+  };
 
   const handleRemoveWidget = async (type: string, registryName?: string) => {
     const target = registryName || type;
@@ -106,15 +122,7 @@ export function WidgetWorkbench({
           )}
         </div>
 
-        {mode === "addWidget" ? (
-          <AddWidget widgets={widgets} />
-        ) : currentComposer?.composer ? (
-          currentComposer.composer({
-            actions: widgetActions[currentComposer.type],
-            authorId: selectedAuthorId,
-            onClose,
-          })
-        ) : null}
+        {renderComposer()}
       </div>
     </div>
   );

@@ -1,0 +1,14 @@
+{
+  "functions": [
+    {
+      "name": "addVote",
+      "description": "Adds a vote for the given poll option when the author has not voted yet.",
+      "pre": "messages do NOT contain a vote for this poll from the calling author"
+    },
+    {
+      "name": "deleteVote",
+      "description": "Removes the calling author's vote for a poll if it exists.",
+      "pre": "messages contain a vote for this poll from the calling author"
+    }
+  ]
+}

@@ -423,6 +423,17 @@ if (
   document.head.appendChild(style);
 }
 
+export const examplepoll: ChatWidgetDefinition<PollActions> = {
+  type: "createPoll",
+  registryName: "examplepoll",
+  elements: {
+    render: (props) => <PollView {...props} />,
+    composer: (props) => <PollComposer {...props} />,
+  },
+  createActions,
+  hideMessage: (message) => message.type === "vote",
+};
+
 // Get all vote messages for author
 const getVotesForAuthor = (
   messages: Message[],
@@ -472,15 +483,4 @@ export const checkPostDeleteVote = (
   const prevVotes = getVotesForAuthor(prevMessages, pollId, authorId).length;
   const nextVotes = getVotesForAuthor(nextMessages, pollId, authorId).length;
   return prevVotes > 0 && nextVotes === 0;
-};
-
-export const examplepoll: ChatWidgetDefinition<PollActions> = {
-  type: "createPoll",
-  registryName: "examplepoll",
-  elements: {
-    render: (props) => <PollView {...props} />,
-    composer: (props) => <PollComposer {...props} />,
-  },
-  createActions,
-  hideMessage: (message) => message.type === "vote",
 };

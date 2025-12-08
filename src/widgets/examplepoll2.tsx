@@ -71,10 +71,7 @@ function createActions({
   ) => {
     const alreadyVoted = getMessagesSnapshot().some(
       (m) =>
-        m.type === "vote" &&
-        isVoteCustom(m.custom) &&
-        m.custom.pollId === pollId &&
-        m.authorId === authorId
+        m.type === "vote" && isVoteCustom(m.custom) && m.authorId === authorId
     );
     if (alreadyVoted) return;
 
@@ -425,9 +422,9 @@ if (
   document.head.appendChild(style);
 }
 
-export const examplepoll: ChatWidgetDefinition<PollActions> = {
+export const examplepoll2: ChatWidgetDefinition<PollActions> = {
   type: "createPoll",
-  registryName: "examplepoll",
+  registryName: "examplepoll2",
   elements: {
     render: (props) => <PollView {...props} />,
     composer: (props) => <PollComposer {...props} />,

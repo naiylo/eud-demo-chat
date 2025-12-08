@@ -41,7 +41,11 @@ const DEMO_VARIANTS = [
 class DemoDatabaseObserver {
   constructor(
     private getSnapshot: () => Message[],
-    private onDeletion: (info: { action: string; deleted: Message[] }) => void
+    private onChange: (info: {
+      action: string;
+      added: Message[];
+      deleted: Message[];
+    }) => void
   ) {}
 
   wrap<T extends Record<string, any>>(actions: T): T {
@@ -53,11 +57,17 @@ class DemoDatabaseObserver {
       }
       wrapped[key] = async (...args: any[]) => {
         const before = this.getSnapshot();
+        console.log("[DemoObserver]", key, "snapshot before", before);
         const result = await value(...args);
+        // Let any queued state updates flush before taking the after snapshot.
+        await Promise.resolve();
+        await new Promise((resolve) => setTimeout(resolve, 0));
         const after = this.getSnapshot();
+        console.log("[DemoObserver]", key, "snapshot after", after);
+        const added = after.filter((a) => !before.some((b) => b.id === a.id));
         const deleted = before.filter((b) => !after.some((a) => a.id === b.id));
-        if (deleted.length) {
-          this.onDeletion({ action: key, deleted });
+        if (added.length || deleted.length) {
+          this.onChange({ action: key, added, deleted });
         }
         return result;
       };
@@ -66,112 +76,66 @@ class DemoDatabaseObserver {
   }
 }
 
-const SAMPLE_STREAMS: Record<string, Message[]> = {
-  message: [
-    {
-      id: "m-demo-1",
-      authorId: "designer",
-      text: "Designer kicks off with a warm hello.",
-      timestamp: new Date().toISOString(),
-      type: "message",
-      custom: [],
-    },
-    {
-      id: "m-demo-2",
-      authorId: "engineer",
-      text: "Engineer replies and acknowledges the brief.",
-      timestamp: new Date().toISOString(),
-      type: "message",
-      custom: [],
-    },
-    {
-      id: "m-demo-3",
-      authorId: "chief",
-      text: "PM confirms the handoff and next steps.",
-      timestamp: new Date().toISOString(),
-      type: "message",
-      custom: [],
-    },
-  ],
-  createPoll: [
-    {
-      id: "poll-1764507520662",
-      authorId: "engineer",
-      text: "Product direction",
-      timestamp: "2025-11-30T12:58:40.662Z",
-      type: "createPoll",
-      custom: {
-        prompt: "Product direction",
-        options: [
-          { id: "opt-preview-a", label: "Ship MVP" },
-          { id: "opt-preview-b", label: "Polish for two more weeks" },
-        ],
-      },
-    },
-    {
-      id: "poll-1764507529387",
-      authorId: "engineer",
-      text: "Frontend stack",
-      timestamp: "2025-11-30T12:58:49.387Z",
-      type: "createPoll",
-      custom: {
-        prompt: "Frontend stack",
-        options: [
-          { id: "opt-preview-c", label: "Stay with React" },
-          { id: "opt-preview-d", label: "Try a lighter UI lib" },
-        ],
-      },
-    },
-    {
-      id: "vote-1764507537425",
-      authorId: "engineer",
-      text: "",
-      timestamp: "2025-11-30T12:58:57.425Z",
-      type: "vote",
-      custom: { pollId: "poll-1764507520662", optionId: "opt-preview-a" },
-    },
-    {
-      id: "vote-1764507538116",
-      authorId: "engineer",
-      text: "",
-      timestamp: "2025-11-30T12:58:58.116Z",
-      type: "vote",
-      custom: { pollId: "poll-1764507529387", optionId: "opt-preview-d" },
-    },
-    {
-      id: "vote-1764507539453",
-      authorId: "designer",
-      text: "",
-      timestamp: "2025-11-30T12:58:59.453Z",
-      type: "vote",
-      custom: { pollId: "poll-1764507520662", optionId: "opt-preview-b" },
-    },
-    {
-      id: "vote-1764507540057",
-      authorId: "designer",
-      text: "",
-      timestamp: "2025-11-30T12:59:00.057Z",
-      type: "vote",
-      custom: { pollId: "poll-1764507529387", optionId: "opt-preview-c" },
-    },
-    {
-      id: "vote-1764507541499",
-      authorId: "chief",
-      text: "",
-      timestamp: "2025-11-30T12:59:01.499Z",
-      type: "vote",
-      custom: { pollId: "poll-1764507520662", optionId: "opt-preview-a" },
-    },
-    {
-      id: "vote-1764507544073",
-      authorId: "chief",
-      text: "",
-      timestamp: "2025-11-30T12:59:04.073Z",
-      type: "vote",
-      custom: { pollId: "poll-1764507529387", optionId: "opt-preview-c" },
-    },
-  ],
+type DemoScriptContext = {
+  actions: unknown;
+  wait: (ms: number) => Promise<void>;
+  getMessages: () => Message[];
 };
+
+const DEMO_SCRIPTS: Record<string, (ctx: DemoScriptContext) => Promise<void>> =
+  {
+    createPoll: async ({ actions, wait, getMessages }) => {
+      const pollActions = actions as {
+        createPoll?: (
+          poll: { prompt: string; options: { id: string; label: string }[] },
+          authorId: string
+        ) => Promise<string | undefined>;
+        addVote?: (
+          pollId: string,
+          optionId: string,
+          authorId: string
+        ) => Promise<void>;
+        deleteVote?: (pollId: string, authorId: string) => Promise<void>;
+      };
+      if (
+        !pollActions.createPoll ||
+        !pollActions.addVote ||
+        !pollActions.deleteVote
+      ) {
+        console.warn("Poll demo missing required actions");
+        return;
+      }
+      const prompt = "Product direction";
+      const options = [
+        { id: "opt-preview-a", label: "Ship MVP" },
+        { id: "opt-preview-b", label: "Polish for two more weeks" },
+      ];
+
+      const createdId = await pollActions.createPoll(
+        { prompt, options },
+        "engineer"
+      );
+      const pollId =
+        createdId ??
+        getMessages().find(
+          (m) =>
+            m.type === "createPoll" &&
+            typeof (m.custom as any)?.prompt === "string" &&
+            (m.custom as any).prompt === prompt
+        )?.id;
+      if (!pollId) return;
+
+      await wait(2000);
+      await pollActions.addVote(pollId, "opt-preview-a", "engineer");
+      await wait(2000);
+      await pollActions.addVote(pollId, "opt-preview-b", "designer");
+      await wait(2000);
+      await pollActions.addVote(pollId, "opt-preview-a", "chief");
+      await wait(2000);
+      await pollActions.deleteVote(pollId, "designer");
+      await wait(2000);
+    },
+  };
 
 export function WidgetPreviewDemo({
   widget,
@@ -212,23 +176,47 @@ export function WidgetPreviewDemo({
   );
 
   const previewActions = useMemo(() => {
+    const syncSetMessages: typeof setPreviewMessages = (updater) =>
+      setPreviewMessages((prev) => {
+        const next =
+          typeof updater === "function" ? (updater as any)(prev) : updater;
+        messagesRef.current = next;
+        return next;
+      });
+
     const observer = new DemoDatabaseObserver(
       () => messagesRef.current,
-      ({ action, deleted }) => {
-        setDbAlert(
-          `⚠️ ${action} removed ${deleted.length} record${
-            deleted.length === 1 ? "" : "s"
-          } from the demo data.`
-        );
+      ({ action, added, deleted }) => {
+        const parts: string[] = [];
+        if (added.length) {
+          const typeSummary = Array.from(
+            new Set(added.map((msg) => msg.type))
+          ).join(", ");
+          parts.push(`${added.length} added (${typeSummary})`);
+        }
+        if (deleted.length) {
+          const typeSummary = Array.from(
+            new Set(deleted.map((msg) => msg.type))
+          ).join(", ");
+          parts.push(`${deleted.length} removed (${typeSummary})`);
+        }
+        if (parts.length) {
+          const msg = `Info: ${action} ${parts.join(" · ")}.`;
+          console.log("[DemoObserver] setDbAlert ->", msg, {
+            added,
+            deleted,
+          });
+          setDbAlert(msg);
+        }
       }
     );
     const baseActions = widget.createActions({
       addMessage: async () => {},
       deleteMessage: async (id) => {
-        setPreviewMessages((cur) => cur.filter((m) => m.id !== id));
+        syncSetMessages((cur) => cur.filter((m) => m.id !== id));
       },
       getMessagesSnapshot: () => messagesRef.current,
-      setMessages: setPreviewMessages,
+      setMessages: syncSetMessages,
     });
     return observer.wrap(baseActions);
   }, [widget]);
@@ -239,21 +227,23 @@ export function WidgetPreviewDemo({
     timeoutRef.current = [];
     setPreviewMessages([]);
     setDbAlert("");
-    setIsPlaying(true);
+    const wait = (ms: number) =>
+      new Promise<void>((resolve) => {
+        const handle = window.setTimeout(resolve, ms);
+        timeoutRef.current.push(handle);
+      });
 
-    const stream = SAMPLE_STREAMS[widget.type] ?? SAMPLE_STREAMS.message ?? [];
-    stream.forEach((msg, index) => {
-      const handle = window.setTimeout(() => {
-        setPreviewMessages((cur) => [...cur, msg]);
-        if (index === stream.length - 1) {
-          setIsPlaying(false);
-        }
-      }, 300 + index * 600);
-      timeoutRef.current.push(handle);
-    });
-
-    if (!stream.length) {
-      setIsPlaying(false);
+    const script = DEMO_SCRIPTS[widget.type];
+    if (script) {
+      setIsPlaying(true);
+      script({
+        actions: previewActions,
+        wait,
+        getMessages: () => messagesRef.current,
+      })
+        .catch((err) => console.error("Demo script failed", err))
+        .finally(() => setIsPlaying(false));
+      return;
     }
   };
 
@@ -497,6 +487,8 @@ export function WidgetPreviewDemo({
   const variantDetails =
     DEMO_VARIANTS.find((opt) => opt.id === variant) ?? DEMO_VARIANTS[0];
 
+  const widgetDisplayName = widget.registryName;
+
   return (
     <div className="preview-modal-overlay" onClick={onClose}>
       <div
@@ -508,7 +500,7 @@ export function WidgetPreviewDemo({
         <header className="preview-modal__header">
           <div>
             <p className="widget-preview__label" style={{ marginBottom: 4 }}>
-              Demoing widget type <strong>{widget.type}</strong>
+              Demoing widget <strong>{widgetDisplayName}</strong>
             </p>
             <p className="widget-preview__hint">
               Messages animate in via this widget&apos;s actions and styling.

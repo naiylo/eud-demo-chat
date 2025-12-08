@@ -102,14 +102,14 @@ export function WidgetWorkbench({
                   type="button"
                   className="pill-group__label"
                   onClick={() => setMode(w.type)}
-                  aria-label={`Open ${w.type} composer`}
+                  aria-label={`Open ${w.registryName as string} composer`}
                 >
-                  {w.type}
+                  {w.registryName}
                 </button>
                 <button
                   type="button"
                   className="pill-group__remove"
-                  aria-label={`Remove ${w.registryName || w.type} widget`}
+                  aria-label={`Remove ${w.registryName as string} widget`}
                   onClick={() => handleRemoveWidget(w.type, w.registryName)}
                 >
                   ×
@@ -117,9 +117,7 @@ export function WidgetWorkbench({
               </div>
             ))}
           </div>
-          {removeNotice && (
-            <p className="workbench-helper">{removeNotice}</p>
-          )}
+          {removeNotice && <p className="workbench-helper">{removeNotice}</p>}
         </div>
 
         {renderComposer()}

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Message, Persona } from "../db/sqlite";
 import type { ChatWidgetDefinition } from "../widgets/types";
+import { generatePollMessageStream, isPreConditionInput, type PostConditionInput, type PreConditionInput } from "../generator/fuzzer";
+import { checkPostAddVote, checkPreAddVote } from "../exampleWidgets/examplepoll";
 
 const PREVIEW_PERSONAS: Persona[] = [
   { id: "designer", name: "Riley", color: "#e86a92", bio: "" },
@@ -35,84 +37,65 @@ const SAMPLE_STREAMS: Record<string, Message[]> = {
       custom: [],
     },
   ],
-  createPoll: [
-    {
-      id: "poll-1764507520662",
-      authorId: "engineer",
-      text: "Product direction",
-      timestamp: "2025-11-30T12:58:40.662Z",
-      type: "createPoll",
-      custom: {
-        prompt: "Product direction",
-        options: [
-          { id: "opt-preview-a", label: "Ship MVP" },
-          { id: "opt-preview-b", label: "Polish for two more weeks" },
-        ],
+  createPoll: generatePollMessageStream({
+      prompt: "What should we have for lunch?",
+      options: [
+        {
+          id: "option-1",
+          label: "Pizza",
+        },
+        {
+          id: "option-2",
+          label: "Sushi",
+        },
+        {
+          id: "option-3",
+          label: "Salad",
+        },
+        {
+          id: "option-4",
+          label: "Burgers",
+        },
+      ]
+  },[
+      {
+          name: "createPoll",
+          description: "Creating a poll",
+          preConditions: [],
+          postConditions: [],
       },
-    },
-    {
-      id: "poll-1764507529387",
-      authorId: "engineer",
-      text: "Frontend stack",
-      timestamp: "2025-11-30T12:58:49.387Z",
-      type: "createPoll",
-      custom: {
-        prompt: "Frontend stack",
-        options: [
-          { id: "opt-preview-c", label: "Stay with React" },
-          { id: "opt-preview-d", label: "Try a lighter UI lib" },
-        ],
-      },
-    },
-    {
-      id: "vote-1764507537425",
-      authorId: "engineer",
-      text: "",
-      timestamp: "2025-11-30T12:58:57.425Z",
-      type: "vote",
-      custom: { pollId: "poll-1764507520662", optionId: "opt-preview-a" },
-    },
-    {
-      id: "vote-1764507538116",
-      authorId: "engineer",
-      text: "",
-      timestamp: "2025-11-30T12:58:58.116Z",
-      type: "vote",
-      custom: { pollId: "poll-1764507529387", optionId: "opt-preview-d" },
-    },
-    {
-      id: "vote-1764507539453",
-      authorId: "designer",
-      text: "",
-      timestamp: "2025-11-30T12:58:59.453Z",
-      type: "vote",
-      custom: { pollId: "poll-1764507520662", optionId: "opt-preview-b" },
-    },
-    {
-      id: "vote-1764507540057",
-      authorId: "designer",
-      text: "",
-      timestamp: "2025-11-30T12:59:00.057Z",
-      type: "vote",
-      custom: { pollId: "poll-1764507529387", optionId: "opt-preview-c" },
-    },
-    {
-      id: "vote-1764507541499",
-      authorId: "pm",
-      text: "",
-      timestamp: "2025-11-30T12:59:01.499Z",
-      type: "vote",
-      custom: { pollId: "poll-1764507520662", optionId: "opt-preview-a" },
-    },
-    {
-      id: "vote-1764507544073",
-      authorId: "pm",
-      text: "",
-      timestamp: "2025-11-30T12:59:04.073Z",
-      type: "vote",
-      custom: { pollId: "poll-1764507529387", optionId: "opt-preview-c" },
-    },
+      {
+          name: "addVote",
+          description: "Voting in a poll",
+          preConditions: [ 
+              {
+                  name: "Poll exists",
+                  description: "The poll being voted on must exist in the message stream",
+                  validate: (input: PreConditionInput | PostConditionInput) => {
+                      if (isPreConditionInput(input)) {
+                          const { stream, pollId, authorId } = input as PreConditionInput;
+                          return checkPreAddVote(stream, pollId, authorId);
+                      }
+                      return false;
+                  }
+              }
+          ],
+          postConditions: [
+              {
+                  name: "Vote counted",
+                  description: "After voting, the vote should be counted in the poll results",
+                  validate: (input: PreConditionInput | PostConditionInput) => {
+                      if (!isPreConditionInput(input)) {
+                          const { prevMessages, nextMessages, pollId, authorId } = input as PostConditionInput;
+                          return checkPostAddVote(prevMessages, nextMessages, pollId, authorId);
+                      }
+                      return false;
+                  }
+              }
+          ],
+      }
   ],
+  { population: 10, generations: 15, maxLength: 30 })
 };
 
 export function WidgetPreviewDemo({
@@ -161,7 +144,7 @@ export function WidgetPreviewDemo({
     setPreviewMessages([]);
     setIsPlaying(true);
 
-    const sampleStream = SAMPLE_STREAMS[widget.type];
+    const sampleStream = SAMPLE_STREAMS[widget.type]; 
 
     const stream = sampleStream ?? [];
     stream.forEach((msg, index) => {

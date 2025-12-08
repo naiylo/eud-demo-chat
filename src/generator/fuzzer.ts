@@ -1,5 +1,6 @@
 import type { Message } from "../db/sqlite";
-import { checkPostAddVote, checkPreAddVote, type VoteCustom } from "../exampleWidgets/examplepoll";
+import { type VoteCustom } from "../exampleWidgets/examplepoll";
+import type { PollCustom } from "../widgets/examplepoll";
 
 export interface FuzzOptions {
     population?: number;
@@ -7,20 +8,20 @@ export interface FuzzOptions {
     maxLength?: number;
 }
 
-type PreConditionInput = {
+export type PreConditionInput = {
     stream: Message[];
     authorId: string;
     pollId: string;
 }
 
-type PostConditionInput = {
+export type PostConditionInput = {
     prevMessages: Message[];
     nextMessages: Message[];
     authorId: string;
     pollId: string;
 }
 
-function isPreConditionInput(input: PreConditionInput | PostConditionInput): input is PreConditionInput {
+export function isPreConditionInput(input: PreConditionInput | PostConditionInput): input is PreConditionInput {
   return (input as PreConditionInput).stream !== undefined;
 }
 export interface Constraint {
@@ -58,50 +59,21 @@ function makeId(prefix: string, reference = false): string {
     return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function createText(authorId: string, rng: () => number): Message {
-    const texts = [
-        "hi",
-        "hans",
-        "status update",
-        "look at this",
-        "I see",
-        "please fix",
-    ];
-    const t = texts[Math.floor(rng() * texts.length)];
-    return {
-        id: makeId("msg"),
-        authorId,
-        text: t,
-        timestamp: nowIso(Math.floor(rng() * 1000)),
-        type: "message",
-        custom: [],
-    };
-}
-
-function createPoll(authorId: string): Message {
-    const promptPool = ["Favorite color?", "Lunch plans?", "Which feature?"];
-    const optionsPool = [
-        ["Red", "Blue", "Green"],
-        ["Pizza", "Salad", "Kebab", "Whatever mensa offers", "Beer"],
-        ["A", "B", "C", "D"],
-    ];
-
-    const idx = Math.floor(Math.random() * promptPool.length);
-
+function createPoll(authorId: string, prompt: string, optionIds: string[]): Message {
     const pollId = makeId("poll");
     polls.push(pollId);
 
     return {
         id: pollId,
         authorId,
-        text: promptPool[idx],
+        text: prompt,
         timestamp: nowIso(Math.floor(Math.random() * 1000)),
         type: "createPoll",
-        custom: { prompt: promptPool[idx], options: optionsPool[idx] },
+        custom: { prompt, options: optionIds },
     };
 }
 
-function createVote(authorId: string, pollId?: string, optionIndex?: number): Message {
+function createVote(authorId: string, optionCount: number, pollId?: string, optionIndex?: number): Message {
     return {
         id: makeId("vote"),
         authorId,
@@ -110,7 +82,7 @@ function createVote(authorId: string, pollId?: string, optionIndex?: number): Me
         type: "vote",
         custom: {
             pollId: pollId ?? makeId("poll", true),
-            optionIndex: optionIndex ?? Math.floor(Math.random() * 4),
+            optionIndex: optionIndex ?? Math.floor(Math.random() * optionCount),
         },
     };
 }
@@ -151,24 +123,22 @@ function fitness(stream: Message[], actions: Action[]): number {
     return score;
 }
 
-function randomInitial(maxLen: number): Message[] {
+function randomInitial(maxLen: number, prompt: string, optionIds: string[]): Message[] {
     const len = 3 + Math.floor(Math.random() * Math.min(12, maxLen));
     const stream: Message[] = [];
     for (let i = 0; i < len; i++) {
         const a = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
         const pick = Math.random();
 
-        if (pick < 0.35) 
-            stream.push(createText(a, Math.random));
-        else if (pick < 0.55) 
-            stream.push(createPoll(a));
+        if (pick < 0.5) 
+            stream.push(createPoll(a, prompt, optionIds));
         else 
-            stream.push(createVote(a));
+            stream.push(createVote(a, optionIds.length));
     }
     return stream;
 }
 
-function mutate(stream: Message[], maxLen: number): Message[] {
+function mutate(stream: Message[], maxLen: number, prompt: string, optionIds: string[]): Message[] {
     const streamClone = cloneMessageStream(stream);
     const operation = Math.random();
     if (operation < 0.2 && streamClone.length < maxLen) {
@@ -177,12 +147,10 @@ function mutate(stream: Message[], maxLen: number): Message[] {
         const choice = Math.random();
         let m: Message;
 
-        if (choice < 0.3) 
-            m = createText(who, Math.random);
-        else if (choice < 0.5) 
-            m = createPoll(who);
+        if (choice < 0.5) 
+            m = createPoll(who, prompt, optionIds);
         else 
-            m = createVote(who);
+            m = createVote(who, optionIds.length);
 
         const pos = Math.floor(Math.random() * (streamClone.length + 1));
         streamClone.splice(pos, 0, m);
@@ -245,13 +213,13 @@ function crossover(a: Message[], b: Message[]): Message[] {
     return child;
 }
 
-export function generatePollMessageStream(actions: Action[], options?: FuzzOptions): Message[] {
+export function generatePollMessageStream(poll: PollCustom, actions: Action[], options?: FuzzOptions): Message[] {
     const opts = { ...DEFAULT_OPTIONS, ...(options ?? {}) } as Required<FuzzOptions>;
 
     // initialize population
     const population: Message[][] = [];
     for (let i = 0; i < opts.population; i++) 
-        population.push(randomInitial(opts.maxLength));
+        population.push(randomInitial(opts.maxLength, poll.prompt, poll.options.map(o => o.id)));
 
     let best: Message[] = population[0];
     let bestScore = fitness(best, actions);
@@ -279,7 +247,7 @@ export function generatePollMessageStream(actions: Action[], options?: FuzzOptio
 
             let child = crossover(pA, pB);
             if (Math.random() < 0.7) 
-                child = mutate(child, opts.maxLength);
+                child = mutate(child, opts.maxLength, poll.prompt, poll.options.map(o => o.id));
 
             nextGen.push(child);
         }
@@ -297,43 +265,3 @@ export function generatePollMessageStream(actions: Action[], options?: FuzzOptio
 
     return out;
 }
-
-console.log(generatePollMessageStream([
-    {
-        name: "createPoll",
-        description: "Creating a poll",
-        preConditions: [],
-        postConditions: [],
-    },
-    {
-        name: "addVote",
-        description: "Voting in a poll",
-        preConditions: [ 
-            {
-                name: "Poll exists",
-                description: "The poll being voted on must exist in the message stream",
-                validate: (input: PreConditionInput | PostConditionInput) => {
-                    if (isPreConditionInput(input)) {
-                        const { stream, pollId, authorId } = input as PreConditionInput;
-                        return checkPreAddVote(stream, pollId, authorId);
-                    }
-                    return false;
-                }
-            }
-        ],
-        postConditions: [
-            {
-                name: "Vote counted",
-                description: "After voting, the vote should be counted in the poll results",
-                validate: (input: PreConditionInput | PostConditionInput) => {
-                    if (!isPreConditionInput(input)) {
-                        const { prevMessages, nextMessages, pollId, authorId } = input as PostConditionInput;
-                        return checkPostAddVote(prevMessages, nextMessages, pollId, authorId);
-                    }
-                    return false;
-                }
-            }
-        ],
-    }
-],
-{ population: 10, generations: 15, maxLength: 30 }));

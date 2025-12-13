@@ -1,5 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Message, Persona } from "../db/sqlite";
+import {
+  DemoStreamInspector,
+  type DemoActionInsight,
+  type DemoInspectorVariant,
+} from "./DemoStreamInspector";
 import type { ChatWidgetDefinition } from "../widgets/types";
 
 const PREVIEW_PERSONAS: Persona[] = [
@@ -8,45 +13,29 @@ const PREVIEW_PERSONAS: Persona[] = [
   { id: "chief", name: "Tom", color: "#00a676", bio: "" },
 ];
 
-const DEMO_VARIANTS = [
-  {
-    id: "widget",
-    label: "Widget view",
-    description: "Shows the widget renderer and hides what the widget hides.",
-  },
-  {
-    id: "actions",
-    label: "Action log",
-    description:
-      "Focuses on the actions being fired instead of the rendered UI.",
-  },
-  {
-    id: "database",
-    label: "Data view",
-    description: "Displays the live JSON payloads that would hit the database.",
-  },
-  {
-    id: "wire",
-    label: "Ghost stream",
-    description:
-      "Shows every message in the stream, even the ones the widget suppresses.",
-  },
-  {
-    id: "personas",
-    label: "Persona focus",
-    description: "Highlights who acted last and what each persona is doing.",
-  },
-] as const;
-
 class DemoDatabaseObserver {
+  private getSnapshot: () => Message[];
+  private onChange: (info: {
+    action: string;
+    added: Message[];
+    deleted: Message[];
+    beforeCount: number;
+    afterCount: number;
+  }) => void;
+
   constructor(
-    private getSnapshot: () => Message[],
-    private onChange: (info: {
+    getSnapshot: () => Message[],
+    onChange: (info: {
       action: string;
       added: Message[];
       deleted: Message[];
+      beforeCount: number;
+      afterCount: number;
     }) => void
-  ) {}
+  ) {
+    this.getSnapshot = getSnapshot;
+    this.onChange = onChange;
+  }
 
   wrap<T extends Record<string, any>>(actions: T): T {
     const wrapped: Record<string, any> = {};
@@ -66,9 +55,13 @@ class DemoDatabaseObserver {
         console.log("[DemoObserver]", key, "snapshot after", after);
         const added = after.filter((a) => !before.some((b) => b.id === a.id));
         const deleted = before.filter((b) => !after.some((a) => a.id === b.id));
-        if (added.length || deleted.length) {
-          this.onChange({ action: key, added, deleted });
-        }
+        this.onChange({
+          action: key,
+          added,
+          deleted,
+          beforeCount: before.length,
+          afterCount: after.length,
+        });
         return result;
       };
     });
@@ -144,16 +137,28 @@ export function WidgetPreviewDemo({
   widget: ChatWidgetDefinition;
   onClose: () => void;
 }) {
+  const [inspectorMessages, setInspectorMessages] = useState<Message[]>([]);
+  const inspectorMessagesRef = useRef<Message[]>([]);
+  const [inspectorInsights, setInspectorInsights] = useState<
+    DemoActionInsight[]
+  >([]);
   const [previewMessages, setPreviewMessages] = useState<Message[]>([]);
+  const previewMessagesRef = useRef<Message[]>([]);
+  const [previewInsights, setPreviewInsights] = useState<DemoActionInsight[]>(
+    []
+  );
   const [isPlaying, setIsPlaying] = useState(false);
-  const [variant, setVariant] =
-    useState<(typeof DEMO_VARIANTS)[number]["id"]>("widget");
+  const [variant, setVariant] = useState<DemoInspectorVariant>("inspector");
   const [dbAlert, setDbAlert] = useState<string>("");
   const timeoutRef = useRef<number[]>([]);
-  const messagesRef = useRef<Message[]>([]);
+  const hasLoadedInspectorRef = useRef(false);
 
   useEffect(() => {
-    messagesRef.current = previewMessages;
+    inspectorMessagesRef.current = inspectorMessages;
+  }, [inspectorMessages]);
+
+  useEffect(() => {
+    previewMessagesRef.current = previewMessages;
   }, [previewMessages]);
 
   useEffect(() => {
@@ -164,6 +169,13 @@ export function WidgetPreviewDemo({
 
   useEffect(() => {
     setPreviewMessages([]);
+    previewMessagesRef.current = [];
+    setPreviewInsights([]);
+    setInspectorMessages([]);
+    inspectorMessagesRef.current = [];
+    setInspectorInsights([]);
+    hasLoadedInspectorRef.current = false;
+    setDbAlert("");
   }, [widget.type]);
 
   const personaLookup = useMemo(
@@ -175,57 +187,91 @@ export function WidgetPreviewDemo({
     []
   );
 
-  const previewActions = useMemo(() => {
-    const syncSetMessages: typeof setPreviewMessages = (updater) =>
-      setPreviewMessages((prev) => {
-        const next =
-          typeof updater === "function" ? (updater as any)(prev) : updater;
-        messagesRef.current = next;
-        return next;
-      });
+  const makeObservedActions = useCallback(
+    (target: "inspector" | "preview"): Record<string, any> => {
+      const setMessages =
+        target === "inspector" ? setInspectorMessages : setPreviewMessages;
+      const messagesRef =
+        target === "inspector" ? inspectorMessagesRef : previewMessagesRef;
+      const setInsights =
+        target === "inspector" ? setInspectorInsights : setPreviewInsights;
 
-    const observer = new DemoDatabaseObserver(
-      () => messagesRef.current,
-      ({ action, added, deleted }) => {
-        const parts: string[] = [];
-        if (added.length) {
-          const typeSummary = Array.from(
-            new Set(added.map((msg) => msg.type))
-          ).join(", ");
-          parts.push(`${added.length} added (${typeSummary})`);
-        }
-        if (deleted.length) {
-          const typeSummary = Array.from(
-            new Set(deleted.map((msg) => msg.type))
-          ).join(", ");
-          parts.push(`${deleted.length} removed (${typeSummary})`);
-        }
-        if (parts.length) {
-          const msg = `Info: ${action} ${parts.join(" · ")}.`;
-          console.log("[DemoObserver] setDbAlert ->", msg, {
-            added,
-            deleted,
-          });
-          setDbAlert(msg);
-        }
-      }
-    );
-    const baseActions = widget.createActions({
-      addMessage: async () => {},
-      deleteMessage: async (id) => {
-        syncSetMessages((cur) => cur.filter((m) => m.id !== id));
-      },
-      getMessagesSnapshot: () => messagesRef.current,
-      setMessages: syncSetMessages,
-    });
-    return observer.wrap(baseActions);
-  }, [widget]);
+      const syncSetMessages: typeof setMessages = (updater) =>
+        setMessages((prev) => {
+          const next =
+            typeof updater === "function" ? (updater as any)(prev) : updater;
+          messagesRef.current = next;
+          return next;
+        });
 
-  const runDemo = () => {
+      const observer = new DemoDatabaseObserver(
+        () => messagesRef.current,
+        ({ action, added, deleted, beforeCount, afterCount }) => {
+          const timestamp = Date.now();
+          setInsights((cur) => [
+            ...cur,
+            {
+              id: `${action}-${timestamp}-${cur.length + 1}`,
+              action,
+              added,
+              deleted,
+              beforeCount,
+              afterCount,
+              order: cur.length + 1,
+              timestamp,
+            },
+          ]);
+          const parts: string[] = [];
+          if (added.length) {
+            const typeSummary = Array.from(
+              new Set(added.map((msg) => msg.type))
+            ).join(", ");
+            parts.push(`${added.length} added (${typeSummary})`);
+          }
+          if (deleted.length) {
+            const typeSummary = Array.from(
+              new Set(deleted.map((msg) => msg.type))
+            ).join(", ");
+            parts.push(`${deleted.length} removed (${typeSummary})`);
+          }
+          if (parts.length) {
+            const msg = `Info: ${action} ${parts.join(" � ")}.`;
+            setDbAlert(msg);
+          }
+        }
+      );
+
+      const baseActions = widget.createActions({
+        addMessage: async () => {},
+        deleteMessage: async (id) => {
+          syncSetMessages((cur) => cur.filter((m) => m.id !== id));
+        },
+        getMessagesSnapshot: () => messagesRef.current,
+        setMessages: syncSetMessages,
+      }) as Record<string, any>;
+
+      return observer.wrap(baseActions);
+    },
+    [widget]
+  );
+  const inspectorActions = useMemo(
+    () => makeObservedActions("inspector"),
+    [makeObservedActions]
+  );
+  const previewActions = useMemo(
+    () => makeObservedActions("preview"),
+    [makeObservedActions]
+  );
+  const canRunDemo = Boolean(DEMO_SCRIPTS[widget.type]);
+
+  const runDemo = useCallback(() => {
+    const script = DEMO_SCRIPTS[widget.type];
+    if (!script) return;
     if (isPlaying) return;
     timeoutRef.current.forEach((id) => window.clearTimeout(id));
     timeoutRef.current = [];
     setPreviewMessages([]);
+    setActionInsights([]);
     setDbAlert("");
     const wait = (ms: number) =>
       new Promise<void>((resolve) => {
@@ -233,21 +279,24 @@ export function WidgetPreviewDemo({
         timeoutRef.current.push(handle);
       });
 
-    const script = DEMO_SCRIPTS[widget.type];
-    if (script) {
-      setIsPlaying(true);
-      script({
-        actions: previewActions,
-        wait,
-        getMessages: () => messagesRef.current,
-      })
-        .catch((err) => console.error("Demo script failed", err))
-        .finally(() => setIsPlaying(false));
-      return;
-    }
-  };
+    setIsPlaying(true);
+    script({
+      actions: previewActions,
+      wait,
+      getMessages: () => messagesRef.current,
+    })
+      .catch((err) => console.error("Demo script failed", err))
+      .finally(() => setIsPlaying(false));
+  }, [isPlaying, previewActions, widget.type]);
 
-  const renderer = widget.elements?.render ?? (widget as any)?.render;
+  useEffect(() => {
+    if (!canRunDemo) return;
+    if (variant !== "inspector") return;
+    if (isPlaying) return;
+    if (actionInsights.length > 0) return;
+    runDemo();
+  }, [canRunDemo, variant, isPlaying, actionInsights.length, runDemo]);
+
   const visibleMessages = useMemo(
     () =>
       previewMessages.filter(
@@ -275,94 +324,6 @@ export function WidgetPreviewDemo({
       return `Voted for ${vote?.optionId ?? "an option"}`;
     }
     return `Triggered ${msg.type}`;
-  };
-
-  const renderWidgetView = () => {
-    if (!renderer) {
-      return (
-        <p className="widget-preview__placeholder">
-          Widget does not expose a renderer.
-        </p>
-      );
-    }
-    if (!previewMessages.length) {
-      return (
-        <p className="widget-preview__placeholder">
-          Hit play to see how this widget paints messages.
-        </p>
-      );
-    }
-
-    if (!visibleMessages.length) {
-      return (
-        <p className="widget-preview__placeholder">
-          All current messages are hidden by this widget&apos;s hideMessage
-          rule.
-        </p>
-      );
-    }
-
-    return visibleMessages.map((msg) => (
-      <div
-        key={msg.id}
-        className="widget-preview__message widget-preview__message--modal"
-      >
-        {renderer({
-          message: msg,
-          allMessages: previewMessages,
-          personas: PREVIEW_PERSONAS,
-          currentActorId: msg.authorId,
-          actions: previewActions,
-        })}
-        <span className="widget-preview__meta">{msg.authorId}</span>
-      </div>
-    ));
-  };
-
-  const renderActionLog = () => {
-    if (!previewMessages.length) {
-      return (
-        <p className="widget-preview__placeholder">
-          Actions will appear here as the sample stream plays.
-        </p>
-      );
-    }
-    return (
-      <div className="preview-action-list">
-        {previewMessages.map((msg) => {
-          const persona = personaLookup[msg.authorId];
-          const hidden = widget.hideMessage?.(msg) ?? false;
-          return (
-            <div
-              key={msg.id}
-              className={`preview-action ${
-                hidden ? "preview-action--hidden" : ""
-              }`}
-            >
-              <div className="preview-action__meta">
-                <span
-                  className="preview-avatar"
-                  style={{ background: persona?.color ?? "#3a445f" }}
-                >
-                  {persona?.name?.[0] ?? "?"}
-                </span>
-                <div>
-                  <p className="preview-action__title">
-                    {persona?.name ?? msg.authorId}
-                  </p>
-                  <small className="preview-action__subtitle">
-                    {describeAction(msg)}
-                  </small>
-                </div>
-              </div>
-              <span className="preview-action__tag">
-                {hidden ? "hidden" : msg.type}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    );
   };
 
   const renderDatabaseView = () => (
@@ -459,7 +420,7 @@ export function WidgetPreviewDemo({
                 {card.visible} visible
               </span>
               <span className="preview-persona__stat">
-                {card.lastType ?? "–"}
+                {card.lastType ?? "none"}
               </span>
             </div>
           </div>
@@ -470,29 +431,47 @@ export function WidgetPreviewDemo({
 
   const renderVariant = () => {
     switch (variant) {
-      case "actions":
-        return renderActionLog();
+      case "inspector":
+        return (
+          <DemoStreamInspector
+            widget={widget}
+            personas={PREVIEW_PERSONAS}
+            messages={previewMessages}
+            visibleMessages={visibleMessages}
+            actions={actionInsights}
+            widgetActions={previewActions}
+            onNavigateVariant={setVariant}
+            onReplay={runDemo}
+          />
+        );
       case "database":
         return renderDatabaseView();
       case "wire":
         return renderGhostStream();
       case "personas":
         return renderPersonaFocus();
-      case "widget":
       default:
-        return renderWidgetView();
+        return (
+          <DemoStreamInspector
+            widget={widget}
+            personas={PREVIEW_PERSONAS}
+            messages={previewMessages}
+            visibleMessages={visibleMessages}
+            actions={actionInsights}
+            widgetActions={previewActions}
+            onNavigateVariant={setVariant}
+            onReplay={runDemo}
+          />
+        );
     }
   };
-
-  const variantDetails =
-    DEMO_VARIANTS.find((opt) => opt.id === variant) ?? DEMO_VARIANTS[0];
 
   const widgetDisplayName = widget.registryName;
 
   return (
     <div className="preview-modal-overlay" onClick={onClose}>
       <div
-        className="preview-modal"
+        className="preview-modal preview-modal--wide-inspector"
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
@@ -503,46 +482,15 @@ export function WidgetPreviewDemo({
               Demoing widget <strong>{widgetDisplayName}</strong>
             </p>
             <p className="widget-preview__hint">
-              Messages animate in via this widget&apos;s actions and styling.
+              Inspector loads a full run automatically — no manual playback needed.
             </p>
           </div>
           <div className="preview-modal__actions">
-            <button
-              type="button"
-              className="widget-preview__play"
-              onClick={runDemo}
-              disabled={isPlaying}
-            >
-              {isPlaying ? "Playing..." : "Play sample"}
-            </button>
             <button type="button" className="workbench-close" onClick={onClose}>
               Close
             </button>
           </div>
         </header>
-        <div
-          className="widget-preview__variants"
-          role="tablist"
-          aria-label="Demo variants"
-        >
-          {DEMO_VARIANTS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              role="tab"
-              aria-selected={variant === opt.id}
-              className={`preview-variant ${
-                variant === opt.id ? "preview-variant--active" : ""
-              }`}
-              onClick={() => setVariant(opt.id)}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-        <p className="widget-preview__hint widget-preview__variant-hint">
-          {variantDetails.description}
-        </p>
         {dbAlert && (
           <p
             className="widget-preview__alert"
@@ -553,7 +501,7 @@ export function WidgetPreviewDemo({
           </p>
         )}
         <div
-          className="widget-preview__screen widget-preview__screen--modal"
+          className="widget-preview__screen widget-preview__screen--modal widget-preview__screen--inspector"
           aria-live="polite"
         >
           {renderVariant()}

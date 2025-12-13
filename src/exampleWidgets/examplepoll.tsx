@@ -33,7 +33,7 @@ type PollActions = {
   createPoll: (
     poll: Pick<PollCustom, "prompt" | "options">,
     authorId: string
-  ) => Promise<string>;
+  ) => Promise<string | undefined>;
   addVote: (
     pollId: string,
     optionId: string,

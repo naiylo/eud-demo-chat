@@ -124,7 +124,6 @@ export function WidgetWorkbench({
               </div>
             ))}
           </div>
-          {removeNotice && <p className="workbench-helper">{removeNotice}</p>}
         </div>
 
         {renderComposer()}

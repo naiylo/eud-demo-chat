@@ -120,25 +120,45 @@ const DEMO_SCRIPTS: Record<
       { id: "opt-preview-b", label: "Polish for two more weeks" },
     ];
 
-    const createdId = await pollActions.createPoll(
-      { prompt, options },
-      "engineer"
-    );
+    const prompt2 = "Design direction";
+    const options2 = [
+      { id: "opt-preview-c", label: "Keep current look" },
+      { id: "opt-preview-d", label: "Refresh theme" },
+    ];
 
-    const pollId =
-      createdId ??
-      getMessages().find(
-        (m) =>
-          m.type === "createPoll" &&
-          typeof (m.custom as any)?.prompt === "string" &&
-          (m.custom as any).prompt === prompt
-      )?.id;
+    const createAndResolveId = async (
+      p: string,
+      opts: { id: string; label: string }[]
+    ) => {
+      const createdId = await pollActions.createPoll(
+        { prompt: p, options: opts },
+        "engineer"
+      );
+      return (
+        createdId ??
+        getMessages().find(
+          (m) =>
+            m.type === "createPoll" &&
+            typeof (m.custom as any)?.prompt === "string" &&
+            (m.custom as any).prompt === p
+        )?.id
+      );
+    };
 
-    if (!pollId) return;
-    await pollActions.addVote(pollId, "opt-preview-a", "engineer");
-    await pollActions.addVote(pollId, "opt-preview-b", "designer");
-    await pollActions.addVote(pollId, "opt-preview-a", "chief");
-    await pollActions.deleteVote(pollId, "designer");
+    const pollId = await createAndResolveId(prompt, options);
+    const pollId2 = await createAndResolveId(prompt2, options2);
+
+    if (pollId) {
+      await pollActions.addVote(pollId, "opt-preview-a", "engineer");
+      await pollActions.addVote(pollId, "opt-preview-b", "designer");
+      await pollActions.addVote(pollId, "opt-preview-a", "chief");
+      await pollActions.deleteVote(pollId, "designer");
+    }
+
+    if (pollId2) {
+      await pollActions.addVote(pollId2, "opt-preview-d", "designer");
+      await pollActions.addVote(pollId2, "opt-preview-d", "chief");
+    }
   },
 };
 

@@ -33,14 +33,6 @@ export default function App() {
     })();
   }, []);
 
-  // Message sending is now handled by the message widget actions
-  const handleSend = async (text: string, authorId: string) => {
-    const actions = widgetActions["message"] as
-      | { sendMessage: (text: string, authorId: string) => Promise<void> }
-      | undefined;
-    await actions?.sendMessage(text, authorId);
-  };
-
   const widgetActions: WidgetActionMap = useMemo(() => {
     const deps = {
       addMessage,
@@ -49,9 +41,20 @@ export default function App() {
       getMessagesSnapshot: () => messages,
     };
     return Object.fromEntries(
-      widgetRegistry.map((w) => [w.type, w.createActions(deps)])
+      widgetRegistry.map((w) => [
+        w.registryName ?? w.type,
+        w.createActions(deps),
+      ])
     ) as WidgetActionMap;
   }, [addMessage, deleteMessage, messages, setMessages]);
+
+  // Message sending is now handled by the message widget actions (registry-based)
+  const handleSend = async (text: string, authorId: string) => {
+    const actions = widgetActions["message"] as
+      | { sendMessage: (text: string, authorId: string) => Promise<void> }
+      | undefined;
+    await actions?.sendMessage(text, authorId);
+  };
 
   const handleClearMessages = async () => {
     await clearMessages();

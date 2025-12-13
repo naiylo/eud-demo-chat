@@ -57,8 +57,8 @@ async function ensureRegistry(exportName: string, slug: string) {
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
-  const hasEntry = entries.some((line) =>
-    line.replace(/[,/]/g, "").includes(exportName)
+  const hasEntry = entries.some(
+    (line) => line.replace(/[,/]/g, "").trim() === exportName
   );
 
   if (!hasEntry) {
@@ -84,11 +84,9 @@ async function removeFromRegistry(exportName: string) {
   const lines = content.split("\n");
   const filteredImports = lines.filter((line) => {
     if (!line.startsWith("import")) return true;
-    return (
-      !line.includes(`{ ${exportName} }`) &&
-      !line.includes(`./${exportName}`) &&
-      !line.includes(`./${sanitizeSlug(exportName)}`)
-    );
+    const normalized = line.replace(/[\s{}]/g, "");
+    // Match exact export name, avoid substring collisions (examplepoll vs examplepoll2).
+    return !new RegExp(`\\b${exportName}\\b`).test(normalized);
   });
   const joined = filteredImports.join("\n");
 
@@ -101,7 +99,10 @@ async function removeFromRegistry(exportName: string) {
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean)
-    .filter((line) => !line.replace(/[,/]/g, "").includes(exportName));
+    .filter((line) => {
+      const token = line.replace(/[,/]/g, "").trim();
+      return token !== exportName;
+    });
 
   const bodyString = entries
     .map((line) =>

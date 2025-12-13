@@ -9,10 +9,10 @@ export function AddWidget({ widgets }: { widgets: ChatWidgetDefinition[] }) {
   );
   const [message, setMessage] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewType, setPreviewType] = useState(
-    widgets[0]?.type ?? "message"
+  const [previewKey, setPreviewKey] = useState(
+    widgets[0]?.registryName ?? widgets[0]?.type ?? "message"
   );
-  const [previewTypeEdited, setPreviewTypeEdited] = useState(false);
+  const [previewKeyEdited, setPreviewKeyEdited] = useState(false);
 
   const exportName = useMemo(() => {
     const match = code.match(/export const\s+(\w+)/);
@@ -25,30 +25,29 @@ export function AddWidget({ widgets }: { widgets: ChatWidgetDefinition[] }) {
   }, [code]);
 
   useEffect(() => {
-    if (!previewTypeEdited) {
-      setPreviewType(inferredWidgetType);
+    if (previewKeyEdited) return;
+    const inferredMatch =
+      widgets.find((w) => w.type === inferredWidgetType)?.registryName ??
+      widgets.find((w) => w.type === inferredWidgetType)?.type;
+    if (inferredMatch) {
+      setPreviewKey(inferredMatch);
     }
-  }, [inferredWidgetType, previewTypeEdited]);
+  }, [inferredWidgetType, previewKeyEdited, widgets]);
 
   useEffect(() => {
-    if (!widgets.length || previewTypeEdited) return;
-    setPreviewType(widgets[0]?.type ?? "message");
-  }, [widgets, previewTypeEdited]);
+    if (!widgets.length || previewKeyEdited) return;
+    setPreviewKey(widgets[0]?.registryName ?? widgets[0]?.type ?? "message");
+  }, [widgets, previewKeyEdited]);
 
-  const knownWidgets = useMemo(() => {
-    const seen = new Set<string>();
-    return widgets.filter((w) => {
-      const key = w.registryName || w.type;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }, [widgets]);
+  const knownWidgets = useMemo(() => widgets, [widgets]);
 
-  const matchedWidget = knownWidgets.find((w) => w.type === previewType);
+  const matchedWidget = knownWidgets.find(
+    (w) => (w.registryName ?? w.type) === previewKey
+  );
   const fallbackWidget =
     knownWidgets.find((w) => w.type === inferredWidgetType) ?? knownWidgets[0];
   const previewWidget = matchedWidget ?? fallbackWidget ?? knownWidgets[0];
+  const availableNames = knownWidgets.map((w) => w.registryName ?? w.type);
 
   const handleSubmit = async () => {
     if (!code.trim()) return;
@@ -123,22 +122,25 @@ export function AddWidget({ widgets }: { widgets: ChatWidgetDefinition[] }) {
             className="add-widget-helper"
             style={{ display: "grid", gap: 6 }}
           >
-            Preview type (editable)
+            Preview widget (registry name)
             <input
               type="text"
-              value={previewType}
+              value={previewKey}
               onChange={(e) => {
-                setPreviewTypeEdited(true);
-                setPreviewType(e.target.value.trim());
+                setPreviewKeyEdited(true);
+                setPreviewKey(e.target.value.trim());
               }}
-              placeholder="e.g. createPoll"
+              placeholder="e.g. examplepoll"
               className="add-widget-preview-input"
             />
             <small>
-              Inferred from code: <strong>{inferredWidgetType}</strong>
+              Inferred type: <strong>{inferredWidgetType}</strong>
               {matchedWidget
                 ? " · Found matching widget"
                 : " · Not registered yet, preview uses closest match"}
+            </small>
+            <small>
+              Available registry names: {availableNames.join(", ")}
             </small>
           </label>
           <button
@@ -152,9 +154,9 @@ export function AddWidget({ widgets }: { widgets: ChatWidgetDefinition[] }) {
             The demo opens a roomy modal and scales the widget down to fit while
             keeping its styling intact.
           </p>
-          {!matchedWidget && previewType && (
+          {!matchedWidget && previewKey && (
             <p className="add-widget-helper" style={{ color: "var(--muted)" }}>
-              Widget type <strong>{previewType}</strong> is not registered in
+              Widget registry <strong>{previewKey}</strong> is not registered in
               this session. Submit and reload to preview its real styling.
             </p>
           )}

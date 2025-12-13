@@ -1134,6 +1134,11 @@
   background: rgba(255, 118, 118, 0.08);
 }
 
+.analytics-impact-sep {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 6px 0;
+}
+
 .analytics-impact__title {
   margin: 0;
   font-weight: 700;

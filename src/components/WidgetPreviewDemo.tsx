@@ -148,17 +148,12 @@ const DEMO_SCRIPTS: Record<
     const pollId = await createAndResolveId(prompt, options);
     const pollId2 = await createAndResolveId(prompt2, options2);
 
-    if (pollId) {
-      await pollActions.addVote(pollId, "opt-preview-a", "engineer");
-      await pollActions.addVote(pollId, "opt-preview-b", "designer");
-      await pollActions.addVote(pollId, "opt-preview-a", "chief");
-      await pollActions.deleteVote(pollId, "designer");
-    }
-
-    if (pollId2) {
-      await pollActions.addVote(pollId2, "opt-preview-d", "designer");
-      await pollActions.addVote(pollId2, "opt-preview-d", "chief");
-    }
+    await pollActions.addVote(pollId, "opt-preview-a", "engineer");
+    await pollActions.addVote(pollId, "opt-preview-b", "designer");
+    await pollActions.addVote(pollId, "opt-preview-a", "chief");
+    await pollActions.addVote(pollId2, "opt-preview-d", "designer");
+    await pollActions.addVote(pollId2, "opt-preview-d", "chief");
+    await pollActions.deleteVote(pollId, "designer");
   },
 };
 
@@ -374,6 +369,16 @@ export function WidgetPreviewDemo({
       actions: actions.length,
       added: actions.reduce((sum, action) => sum + action.added.length, 0),
       removed: actions.reduce((sum, action) => sum + action.deleted.length, 0),
+      perAction: actions.reduce<
+        Record<string, { count: number; adds: number; dels: number }>
+      >((acc, action) => {
+        const bucket = acc[action.action] ?? { count: 0, adds: 0, dels: 0 };
+        bucket.count += 1;
+        bucket.adds += action.added.length;
+        bucket.dels += action.deleted.length;
+        acc[action.action] = bucket;
+        return acc;
+      }, {}),
     }),
     [actions]
   );
@@ -503,30 +508,30 @@ export function WidgetPreviewDemo({
                 <div>
                   <h3 className="analytics-label">Aggregated stats</h3>
                   <p className="analytics-note">
-                    High-level overview of database impact across the trace.
+                    Overview of database impact across the trace.
                   </p>
                 </div>
               </div>
 
-              <div className="analytics-stats">
-                <div className="analytics-stat-card">
-                  <p className="analytics-stat__label">Actions executed</p>
-                  <p className="analytics-stat__value">{totals.actions}</p>
-                </div>
-                <div className="analytics-stat-card">
-                  <p className="analytics-stat__label">Records created</p>
-                  <p className="analytics-stat__value">{totals.added}</p>
-                </div>
-                <div className="analytics-stat-card">
-                  <p className="analytics-stat__label">Records removed</p>
-                  <p className="analytics-stat__value">{totals.removed}</p>
-                </div>
-                <div className="analytics-stat-card">
-                  <p className="analytics-stat__label">Net change</p>
-                  <p className="analytics-stat__value">
-                    {totals.added - totals.removed}
+              <div className="analytics-stats"></div>
+              <div className="analytics-impact-list">
+                {actions.length === 0 && (
+                  <p className="analytics-placeholder">
+                    Actions will appear here after the automatic sample run.
                   </p>
-                </div>
+                )}
+                {Object.entries(totals.perAction).map(([actionName, info]) => (
+                  <div key={actionName} className="analytics-impact-row">
+                    <span className="analytics-pill">×{info.count}</span>
+                    <div>
+                      <p className="analytics-impact__title">{actionName}</p>
+                      <p className="analytics-impact__desc">
+                        {info.adds > 0 ? `${info.adds} created` : "0 created"} |{" "}
+                        {info.dels > 0 ? `${info.dels} removed` : "0 removed"}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
             <div className="analytics-panel">
@@ -590,7 +595,6 @@ export function WidgetPreviewDemo({
                   <h3 className="analytics-label">Action timeline</h3>
                   <p className="analytics-note">
                     Chronological list of actions and their database effects.
-                    Numbers mirror the overlays on the widget.
                   </p>
                 </div>
               </div>

@@ -37,7 +37,6 @@ type HeuristicFinding = {
   actionOrder: number;
 };
 
-// Heuristics live here so rules can be tweaked without touching rendering logic.
 const HEURISTIC_RULES: HeuristicRule[] = [
   {
     id: "deleteVote-multi",
@@ -81,80 +80,127 @@ const HEURISTIC_RULES: HeuristicRule[] = [
   },
 ];
 
-// Existing demo scripts can still power the trace, but run only on demand here.
 type DemoScriptContext = {
   actions: unknown;
   wait: (ms: number) => Promise<void>;
   getMessages: () => Message[];
 };
 
-const DEMO_SCRIPTS: Record<
-  string,
-  (context: DemoScriptContext) => Promise<void>
-> = {
-  createPoll: async ({ actions, wait, getMessages }) => {
-    const pollActions = actions as {
-      createPoll?: (
-        poll: { prompt: string; options: { id: string; label: string }[] },
-        authorId: string
-      ) => Promise<string | undefined>;
-      addVote?: (
-        pollId: string,
-        optionId: string,
-        authorId: string
-      ) => Promise<void>;
-      deleteVote?: (pollId: string, authorId: string) => Promise<void>;
-    };
+type DemoStream = {
+  id: string;
+  run: (context: DemoScriptContext) => Promise<void>;
+};
 
-    if (
-      !pollActions.createPoll ||
-      !pollActions.addVote ||
-      !pollActions.deleteVote
-    ) {
-      return;
-    }
+const DEMO_STREAMS: Record<string, DemoStream[]> = {
+  createPoll: [
+    {
+      id: "one-poll",
+      run: async ({ actions, wait, getMessages }) => {
+        const pollActions = actions as {
+          createPoll?: (
+            poll: { prompt: string; options: { id: string; label: string }[] },
+            authorId: string
+          ) => Promise<string | undefined>;
+          addVote?: (
+            pollId: string,
+            optionId: string,
+            authorId: string
+          ) => Promise<void>;
+          deleteVote?: (pollId: string, authorId: string) => Promise<void>;
+        };
 
-    const prompt = "Product direction";
-    const options = [
-      { id: "opt-preview-a", label: "Ship MVP" },
-      { id: "opt-preview-b", label: "Polish for two more weeks" },
-    ];
+        const prompt = "Product direction";
+        const options = [
+          { id: "opt-preview-a", label: "Ship MVP" },
+          { id: "opt-preview-b", label: "Polish for two more weeks" },
+        ];
 
-    const prompt2 = "Design direction";
-    const options2 = [
-      { id: "opt-preview-c", label: "Keep current look" },
-      { id: "opt-preview-d", label: "Refresh theme" },
-    ];
+        const createAndResolveId = async (
+          p: string,
+          opts: { id: string; label: string }[]
+        ) => {
+          const createdId = await pollActions.createPoll(
+            { prompt: p, options: opts },
+            "engineer"
+          );
+          return (
+            createdId ??
+            getMessages().find(
+              (m) =>
+                m.type === "createPoll" &&
+                typeof (m.custom as any)?.prompt === "string" &&
+                (m.custom as any).prompt === p
+            )?.id
+          );
+        };
 
-    const createAndResolveId = async (
-      p: string,
-      opts: { id: string; label: string }[]
-    ) => {
-      const createdId = await pollActions.createPoll(
-        { prompt: p, options: opts },
-        "engineer"
-      );
-      return (
-        createdId ??
-        getMessages().find(
-          (m) =>
-            m.type === "createPoll" &&
-            typeof (m.custom as any)?.prompt === "string" &&
-            (m.custom as any).prompt === p
-        )?.id
-      );
-    };
+        const pollId = await createAndResolveId(prompt, options);
 
-    const pollId = await createAndResolveId(prompt, options);
-    const pollId2 = await createAndResolveId(prompt2, options2);
+        await pollActions.addVote(pollId, "opt-preview-a", "engineer");
+        await pollActions.addVote(pollId, "opt-preview-b", "designer");
+        await pollActions.addVote(pollId, "opt-preview-a", "chief");
+        await pollActions.deleteVote(pollId, "designer");
+      },
+    },
+    {
+      id: "two-polls",
+      run: async ({ actions, wait, getMessages }) => {
+        const pollActions = actions as {
+          createPoll?: (
+            poll: { prompt: string; options: { id: string; label: string }[] },
+            authorId: string
+          ) => Promise<string | undefined>;
+          addVote?: (
+            pollId: string,
+            optionId: string,
+            authorId: string
+          ) => Promise<void>;
+          deleteVote?: (pollId: string, authorId: string) => Promise<void>;
+        };
 
-    await pollActions.addVote(pollId, "opt-preview-a", "engineer");
-    await pollActions.addVote(pollId, "opt-preview-b", "designer");
-    await pollActions.addVote(pollId, "opt-preview-a", "chief");
-    await pollActions.addVote(pollId2, "opt-preview-d", "designer");
-    await pollActions.addVote(pollId2, "opt-preview-d", "chief");
-    await pollActions.deleteVote(pollId, "designer");
-  },
+        const prompt = "Product direction";
+        const options = [
+          { id: "opt-preview-a", label: "Ship MVP" },
+          { id: "opt-preview-b", label: "Polish for two more weeks" },
+        ];
+
+        const prompt2 = "Design direction";
+        const options2 = [
+          { id: "opt-preview-c", label: "Keep current look" },
+          { id: "opt-preview-d", label: "Refresh theme" },
+        ];
+
+        const createAndResolveId = async (
+          p: string,
+          opts: { id: string; label: string }[]
+        ) => {
+          const createdId = await pollActions.createPoll(
+            { prompt: p, options: opts },
+            "engineer"
+          );
+          return (
+            createdId ??
+            getMessages().find(
+              (m) =>
+                m.type === "createPoll" &&
+                typeof (m.custom as any)?.prompt === "string" &&
+                (m.custom as any).prompt === p
+            )?.id
+          );
+        };
+
+        const pollId = await createAndResolveId(prompt, options);
+        const pollId2 = await createAndResolveId(prompt2, options2);
+
+        await pollActions.addVote(pollId, "opt-preview-a", "engineer");
+        await pollActions.addVote(pollId, "opt-preview-b", "designer");
+        await pollActions.addVote(pollId, "opt-preview-a", "chief");
+        await pollActions.addVote(pollId2, "opt-preview-d", "designer");
+        await pollActions.addVote(pollId2, "opt-preview-d", "chief");
+        await pollActions.deleteVote(pollId, "designer");
+      },
+    },
+  ],
 };
 
 class DemoDatabaseObserver {
@@ -256,12 +302,24 @@ export function WidgetPreviewDemo({
   const messagesRef = useRef<Message[]>([]);
   const [actions, setActions] = useState<DemoActionImpact[]>([]);
   const [isRunning, setIsRunning] = useState(false);
-  const [info, setInfo] = useState("");
-  const hasAutoRun = useRef(false);
+  const [streamIndex, setStreamIndex] = useState(0);
+  const [switchNotice, setSwitchNotice] = useState<string | null>(null);
+  const [acceptedStreamId, setAcceptedStreamId] = useState<string | null>(null);
+  const inFlightStreamsRef = useRef<Set<string>>(new Set());
+  const streamSnapshotsRef = useRef<
+    Map<string, { messages: Message[]; actions: DemoActionImpact[] }>
+  >(new Map());
 
   messagesRef.current = messages;
 
   const renderer = widget.elements?.render ?? (widget as any)?.render;
+  const streamList = useMemo(
+    () => DEMO_STREAMS[widget.type] ?? [],
+    [widget.type]
+  );
+  const activeStream = streamList[streamIndex];
+  const isLastStream =
+    streamList.length > 0 && streamIndex === streamList.length - 1;
 
   const observedActions = useMemo(() => {
     const syncSetMessages: typeof setMessages = (updater) =>
@@ -293,17 +351,6 @@ export function WidgetPreviewDemo({
             timestamp: Date.now(),
           },
         ]);
-
-        if (added.length || deleted.length) {
-          const summary = [] as string[];
-          if (added.length)
-            summary.push(`${added.length} new (${summarizeTypes(added)})`);
-          if (deleted.length)
-            summary.push(
-              `${deleted.length} removed (${summarizeTypes(deleted)})`
-            );
-          setInfo(`${action}: ${summary.join(" | ")}`);
-        }
       }
     );
 
@@ -388,19 +435,20 @@ export function WidgetPreviewDemo({
     [messages, widget]
   );
 
-  const canRunScript = Boolean(DEMO_SCRIPTS[widget.type]);
+  const canRunScript = Boolean(activeStream);
 
   const runSampleTrace = useCallback(async () => {
-    if (!canRunScript || isRunning) return;
+    if (!activeStream || isRunning) return;
 
     setIsRunning(true);
     setMessages([]);
     setActions([]);
-    setInfo("");
+    setAcceptedStreamId(null);
 
-    const script = DEMO_SCRIPTS[widget.type];
+    const script = activeStream?.run;
     if (script) {
-      const wait = async () => Promise.resolve();
+      const wait = async (ms = 0) =>
+        new Promise<void>((resolve) => setTimeout(resolve, ms));
       try {
         await script({
           actions: observedActions,
@@ -413,15 +461,64 @@ export function WidgetPreviewDemo({
     }
 
     setIsRunning(false);
-  }, [canRunScript, isRunning, observedActions, widget.type]);
+  }, [activeStream, observedActions, isRunning]);
 
-  // Auto-run trace on first mount
+  // Load cached stream snapshot or run once to create it.
   useEffect(() => {
-    if (!hasAutoRun.current && canRunScript) {
-      hasAutoRun.current = true;
-      runSampleTrace();
+    if (!activeStream) return;
+    const cached = streamSnapshotsRef.current.get(activeStream.id);
+    if (cached) {
+      setMessages(cached.messages);
+      setActions(cached.actions);
+      setSwitchNotice(null);
+      setAcceptedStreamId(null);
+      return;
     }
-  }, [canRunScript, runSampleTrace]);
+    if (inFlightStreamsRef.current.has(activeStream.id)) return;
+    inFlightStreamsRef.current.add(activeStream.id);
+    setMessages([]);
+    setActions([]);
+    setSwitchNotice(null);
+    setAcceptedStreamId(null);
+    runSampleTrace().finally(() => {
+      inFlightStreamsRef.current.delete(activeStream.id);
+    });
+  }, [activeStream, runSampleTrace]);
+
+  // Cache latest results per stream so they stay static after first creation.
+  useEffect(() => {
+    if (!activeStream) return;
+    streamSnapshotsRef.current.set(activeStream.id, {
+      messages: messagesRef.current,
+      actions,
+    });
+  }, [activeStream, actions]);
+
+  useEffect(() => {
+    setStreamIndex(0);
+    setSwitchNotice(null);
+    setAcceptedStreamId(null);
+    streamSnapshotsRef.current.clear();
+  }, [widget.type]);
+
+  const handleAccept = () => {
+    if (!activeStream) return;
+    setAcceptedStreamId(activeStream.id);
+    setSwitchNotice(null);
+  };
+
+  const handleContinue = () => {
+    if (!streamList.length || isLastStream) return;
+    const nextIndex = streamIndex + 1;
+    setStreamIndex(nextIndex);
+    const nextStream = streamList[nextIndex];
+    setSwitchNotice(
+      `Switched to ${nextStream.label} (stream ${nextIndex + 1} of ${
+        streamList.length
+      })`
+    );
+    setAcceptedStreamId(null);
+  };
 
   const handleOpenDatabaseView = () => {
     onOpenDatabaseView?.({ messages, actions });
@@ -452,6 +549,55 @@ export function WidgetPreviewDemo({
             </button>
           </div>
         </div>
+
+        {canRunScript && activeStream && (
+          <div
+            className="analytics-banner"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              justifyContent: "space-between",
+            }}
+          >
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <span className="analytics-pill">
+                Stream {streamIndex + 1}/{streamList.length}
+              </span>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <strong>{activeStream.label}</strong>
+                  {acceptedStreamId === activeStream.id && (
+                    <span className="analytics-pill">Accepted</span>
+                  )}
+                </div>
+                <p className="analytics-note" style={{ margin: 0 }}>
+                  {activeStream.summary}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {switchNotice && (
+          <div
+            className="analytics-banner"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <span>{switchNotice}</span>
+            <button
+              className="analytics-secondary"
+              onClick={() => setSwitchNotice(null)}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         <div className="analytics-grid">
           <div className="analytics-column analytics-column--left">
@@ -680,6 +826,34 @@ export function WidgetPreviewDemo({
                     </div>
                   );
                 })}
+              </div>
+            </div>
+
+            <div className="analytics-panel analytics-panel--nav">
+              <div>
+                <h3 className="analytics-label">Play demo</h3>
+                <p className="analytics-note">
+                  Accept keeps the current stream; Continue swaps in the next
+                  one until you reach the final stream.
+                </p>
+              </div>
+              <div className="analytics-nav">
+                <button
+                  className="analytics-secondary"
+                  onClick={handleAccept}
+                  disabled={!activeStream}
+                >
+                  Accept
+                </button>
+                <button
+                  className="analytics-secondary"
+                  onClick={handleContinue}
+                  disabled={
+                    !activeStream || streamList.length <= 1 || isLastStream
+                  }
+                >
+                  Continue
+                </button>
               </div>
             </div>
 

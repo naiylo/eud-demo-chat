@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Message, Persona } from "../db/sqlite";
 import type { ChatWidgetDefinition } from "../widgets/types";
 import { generatePollMessageStream, isPreConditionInput, type PostConditionInput, type PreConditionInput } from "../generator/fuzzer";
-import { checkPostAddVote, checkPreAddVote } from "../exampleWidgets/examplepoll";
+import { checkPostAddVote, checkPreAddVote, type PollActions } from "../exampleWidgets/examplepoll";
 
 const PREVIEW_PERSONAS: Persona[] = [
   { id: "designer", name: "Oskar", color: "#e86a92", bio: "" },
@@ -166,7 +166,7 @@ class DemoDatabaseObserver {
   }
 }
 
-type DemoScriptContext = {
+export type DemoScriptContext = {
   actions: unknown;
   wait: (ms: number) => Promise<void>;
   getMessages: () => Message[];
@@ -175,18 +175,7 @@ type DemoScriptContext = {
 const DEMO_SCRIPTS: Record<string, (ctx: DemoScriptContext) => Promise<void>> =
   {
     createPoll: async ({ actions, wait, getMessages }) => {
-      const pollActions = actions as {
-        createPoll?: (
-          poll: { prompt: string; options: { id: string; label: string }[] },
-          authorId: string
-        ) => Promise<string | undefined>;
-        addVote?: (
-          pollId: string,
-          optionId: string,
-          authorId: string
-        ) => Promise<void>;
-        deleteVote?: (pollId: string, authorId: string) => Promise<void>;
-      };
+      const pollActions = actions as PollActions;
       if (
         !pollActions.createPoll ||
         !pollActions.addVote ||

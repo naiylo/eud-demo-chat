@@ -29,18 +29,71 @@ const isVoteCustom = (custom: unknown): custom is VoteCustom =>
   typeof (custom as VoteCustom).pollId === "string" &&
   typeof (custom as VoteCustom).optionId === "string";
 
-type PollActions = {
-  createPoll: (
-    poll: Pick<PollCustom, "prompt" | "options">,
-    authorId: string
-  ) => Promise<string>;
-  addVote: (
-    pollId: string,
-    optionId: string,
-    authorId: string
-  ) => Promise<void>;
-  deleteVote: (pollId: string, authorId: string) => Promise<void>;
-};
+export type CreatePollActionInput = {
+    poll: Pick<PollCustom, "prompt" | "options">; 
+    authorId: string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const isCreatePollActionInput = (input: any): input is CreatePollActionInput => {
+    return (
+        input &&
+        typeof input === "object" &&
+        typeof input.authorId === "string" &&
+        input.poll &&
+        typeof input.poll === "object" &&
+        typeof input.poll.prompt === "string" &&
+        Array.isArray(input.poll.options) &&
+        input.poll.options.every(
+            (opt: unknown) =>
+                opt &&
+                typeof opt === "object" &&
+                typeof (opt as { id?: unknown }).id === "string" &&
+                typeof (opt as { label?: unknown }).label === "string"
+        )
+    );
+}
+
+export type CreatePollActionOutput = string;
+
+export type AddVoteActionInput = {
+    pollId: string;
+    optionId: string;
+    authorId: string;
+}
+
+export const isAddVoteActionInput = (input: unknown): input is AddVoteActionInput => {
+    return (
+        !!input &&
+        typeof (input as AddVoteActionInput).pollId === "string" &&
+        typeof (input as AddVoteActionInput).optionId === "string" &&
+        typeof (input as AddVoteActionInput).authorId === "string"
+    );
+}
+
+export type AddVoteActionOutput = void;
+
+export type ConstraintInput = {
+  pollId: string;
+  authorId: string;
+}
+
+export type DeleteVoteActionInput = {
+  pollId: string;
+  authorId: string;
+}
+
+export const isDeleteVoteActionInput = (input: unknown): input is DeleteVoteActionInput => {
+    return (
+        !!input &&
+        typeof (input as DeleteVoteActionInput).pollId === "string" &&
+        typeof (input as DeleteVoteActionInput).authorId === "string"
+    );
+}
+
+export type DeleteVoteActionOutput = void;
+
+export type PollActions = CreatePollActionInput & AddVoteActionInput & DeleteVoteActionInput;
 
 function createActions({
   addMessage,

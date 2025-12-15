@@ -1,6 +1,8 @@
-import type { Message } from "../db/sqlite";
-import { type VoteCustom } from "../exampleWidgets/examplepoll";
-import type { PollCustom } from "../widgets/examplepoll";
+import type { DemoScriptContext } from "../components/WidgetPreviewDemo";
+import { isAddVoteActionInput, isCreatePollActionInput, type AddVoteActionInput, type AddVoteActionOutput, type ConstraintInput, type CreatePollActionInput, type CreatePollActionOutput, type DeleteVoteActionInput, type DeleteVoteActionOutput } from "../exampleWidgets/examplepoll";
+
+type Input = CreatePollActionInput | AddVoteActionInput | DeleteVoteActionInput;
+type Output = CreatePollActionOutput | AddVoteActionOutput | DeleteVoteActionOutput;
 
 export interface FuzzOptions {
     population?: number;
@@ -8,33 +10,38 @@ export interface FuzzOptions {
     maxLength?: number;
 }
 
-export type PreConditionInput = {
-    stream: Message[];
-    authorId: string;
-    pollId: string;
+export type ConditionInput<I, O, D> = {
+    previousAction: LogEntry<I, O>[];
+    nextActions: LogEntry<I, O>[];
+    data: D;
 }
 
-export type PostConditionInput = {
-    prevMessages: Message[];
-    nextMessages: Message[];
-    authorId: string;
-    pollId: string;
+type LogEntry<I, O> = {
+    action: string;
+    input: I;
+    output: O;
 }
 
-export function isPreConditionInput(input: PreConditionInput | PostConditionInput): input is PreConditionInput {
-  return (input as PreConditionInput).stream !== undefined;
+export function isPreConditionInput(input: ConditionInput<unknown, unknown, unknown>): input is ConditionInput<unknown, unknown, unknown> {
+    return (input as ConditionInput<unknown, unknown, unknown>).previousAction !== undefined;
 }
-export interface Constraint {
+export interface Constraint<I, O, D> {
     name: string;
     description: string;
-    validate: (input: PreConditionInput | PostConditionInput) => boolean;
+    validate: (input: ConditionInput<I, O, D>) => boolean;
 }
 
-export interface Action {
+export interface Action<I, O, D> {
     name: string;
     description: string;
-    preConditions: Constraint[];
-    postConditions: Constraint[];
+    execute(input: I): Promise<O>;
+    preConditions: Constraint<I, O, D>[];
+    postConditions: Constraint<I, O, D>[];
+}
+
+type Poll = {
+    id: string;
+    options: { id: string; label: string }[];
 }
 
 const DEFAULT_OPTIONS: Required<FuzzOptions> = {
@@ -43,225 +50,85 @@ const DEFAULT_OPTIONS: Required<FuzzOptions> = {
     maxLength: 40,
 };
 
-const PERSONAS = ["designer", "engineer", "pm"];
+const polls: Poll[] = [];
 
-function nowIso(offsetMs = 0) {
-    return new Date(Date.now() + offsetMs).toISOString();
-}
-
-const polls: string[] = [];
-
-// reference: use an id referring to a poll
-function makeId(prefix: string, reference = false): string {
-    if (reference) {
-        return polls[Math.floor(Math.random() * polls.length)];
-    }
-    return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function createPoll(authorId: string, prompt: string, optionIds: string[]): Message {
-    const pollId = makeId("poll");
-    polls.push(pollId);
-
-    return {
-        id: pollId,
-        authorId,
-        text: prompt,
-        timestamp: nowIso(Math.floor(Math.random() * 1000)),
-        type: "createPoll",
-        custom: { prompt, options: optionIds },
-    };
-}
-
-function createVote(authorId: string, optionCount: number, pollId?: string, optionIndex?: number): Message {
-    return {
-        id: makeId("vote"),
-        authorId,
-        text: "",
-        timestamp: nowIso(Math.floor(Math.random() * 1000)),
-        type: "vote",
-        custom: {
-            pollId: pollId ?? makeId("poll", true),
-            optionIndex: optionIndex ?? Math.floor(Math.random() * optionCount),
-        },
-    };
-}
-
-function cloneMessageStream(stream: Message[]): Message[] {
-    return stream.map((m) => ({ ...m, custom: JSON.parse(JSON.stringify(m.custom)) }));
-}
-
-// Heuristic scoring: reward "interesting" or "dangerous" patterns
-function fitness(stream: Message[], actions: Action[]): number {
-    let score = 0;
-
-    for(let i = 0; i < stream.length; i++) {
-        const msg = stream[i];
-        const action = actions.find((a) => a.name === msg.type);
-        if (action) {
-            score += 2; // base score for recognized action
+async function createPoll(actions: Action<Input, Output, ConstraintInput>[], creatorId: string): Promise<LogEntry<Input, Output> | undefined> {
+    const action = actions.find(a => a.name === "createPoll");
+    if (isCreatePollActionInput(action)) {
+        const createPoll = action as Action<CreatePollActionInput, CreatePollActionOutput, ConstraintInput>;
+        const options = [];
+        const optionCount = 2 + Math.floor(Math.random() * 4);
+        for (let i = 0; i < optionCount; i++) {
+            options.push({ id: `opt-${i + 1}`, label: `Option ${i + 1}` });
         }
-
-        const authorId = msg.authorId;
-        const pollId: string | null = msg.type === "createPoll" ? msg.id : msg.type === "vote" ? (msg.custom as VoteCustom).pollId : null;
-
-        if (pollId) {
-           action?.preConditions.forEach((constraint) => {
-                if (constraint.validate({ stream: stream.slice(0, i - 1), authorId, pollId })) {
-                    score += 3;
-                }
-            });
-
-            action?.postConditions.forEach((constraint) => {
-                if (constraint.validate({ prevMessages: stream.slice(0, i - 1), nextMessages: stream.slice(i), authorId, pollId })) {
-                    score += 3;
-                }
-            });
-        }
+        const id: string = await createPoll.execute({ authorId: creatorId, poll: { prompt: "Sample?", options } });
+        polls.push({ id, options });
+        return { action: "createPoll", input: { authorId: creatorId, poll: { prompt: "Sample?", options } }, output: id };
     }
-    
-    return score;
 }
 
-function randomInitial(maxLen: number, prompt: string, optionIds: string[]): Message[] {
+async function createVote(actions: Action<Input, Output, ConstraintInput>[], authorId: string, pollId?: string, optionIndex?: number): Promise<LogEntry<Input, Output> | undefined> {
+    const action = actions.find(a => a.name === "addVote");
+    if (isAddVoteActionInput(action)) {
+        const addVote = action as Action<AddVoteActionInput, AddVoteActionOutput, ConstraintInput>;
+        const votePoll = pollId ? polls.find(p => p.id === pollId) : polls[Math.floor(Math.random() * polls.length)];
+        if (!votePoll)
+            return;
+        const voteOptionIndex = optionIndex ?? Math.floor(Math.random() * votePoll.options.length);
+        addVote.execute({ authorId, pollId: votePoll.id, optionId: votePoll.options[voteOptionIndex].id });
+        return { action: "addVote", input: { authorId, pollId: votePoll.id, optionId: votePoll.options[voteOptionIndex].id }, output: undefined };
+    }
+}
+
+async function randomLog(personas: string[], actions: Action<Input, Output, ConstraintInput>[], maxLen: number): Promise<LogEntry<Input, Output>[]> {
     const len = 3 + Math.floor(Math.random() * Math.min(12, maxLen));
-    const stream: Message[] = [];
+    const stream: LogEntry<Input, Output>[] = [];
     for (let i = 0; i < len; i++) {
-        const a = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
-        const pick = Math.random();
+        let failedPreCondition = true;
+        let failedPostCondition = true;
+        let result: LogEntry<Input, Output> | undefined = undefined;
+        while (failedPreCondition || failedPostCondition) {
+            const who = personas[Math.floor(Math.random() * personas.length)];
+            const pick = Math.random();
+            const entry = pick < 0.5 ? await createPoll(actions, who) : await createVote(actions, who);
 
-        if (pick < 0.5) 
-            stream.push(createPoll(a, prompt, optionIds));
-        else 
-            stream.push(createVote(a, optionIds.length));
+            if (entry) {
+                const action = actions.find((act) => act.name === entry?.action);
+                failedPreCondition = !action?.preConditions.every((constraint) =>
+                    constraint.validate({
+                        previousAction: [...stream, entry], 
+                        nextActions: [], 
+                        data: { 
+                            authorId: entry.input.authorId, 
+                            pollId: isCreatePollActionInput(entry) ? (entry.output as string) : (entry.input as AddVoteActionInput | DeleteVoteActionInput).pollId 
+                        } 
+                    })) || false;
+
+                for (let j = 0; j < i; j++) {
+                    for (const action of actions) {
+                        failedPostCondition = !action?.postConditions.every((constraint) => 
+                            constraint.validate({ 
+                                previousAction: stream.slice(0, j), 
+                                nextActions: [...stream.slice(j), entry], 
+                                data: { 
+                                    authorId: entry.input.authorId,
+                                    pollId: isCreatePollActionInput(entry) ? (entry.output as string) : (entry.input as AddVoteActionInput | DeleteVoteActionInput).pollId 
+                                } 
+                            }));
+                    }
+                }
+                result = entry;
+            }
+        }
+        if (result)
+            stream.push(result);
     }
     return stream;
 }
 
-function mutate(stream: Message[], maxLen: number, prompt: string, optionIds: string[]): Message[] {
-    const streamClone = cloneMessageStream(stream);
-    const operation = Math.random();
-    if (operation < 0.2 && streamClone.length < maxLen) {
-        // insert random
-        const who = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
-        const choice = Math.random();
-        let m: Message;
-
-        if (choice < 0.5) 
-            m = createPoll(who, prompt, optionIds);
-        else 
-            m = createVote(who, optionIds.length);
-
-        const pos = Math.floor(Math.random() * (streamClone.length + 1));
-        streamClone.splice(pos, 0, m);
-    } else if (operation < 0.4 && streamClone.length > 0) {
-        // delete random
-        streamClone.splice(Math.floor(Math.random() * streamClone.length), 1);
-    } else if (operation < 0.6 && streamClone.length > 0) {
-        // mutate a random message
-        const msgId = Math.floor(Math.random() * streamClone.length);
-        const m = streamClone[msgId];
-        mutateMessage(m);
-        streamClone[msgId] = m;
-    } else if (operation < 0.8 && streamClone.length > 1) {
-        // swap two
-        const i = Math.floor(Math.random() * streamClone.length);
-        const j = Math.floor(Math.random() * streamClone.length);
-        const tmp = streamClone[i];
-        streamClone[i] = streamClone[j];
-        streamClone[j] = tmp;
-    } else if (streamClone.length > 0) {
-        // duplicate
-        const msgId = Math.floor(Math.random() * streamClone.length);
-        streamClone.splice(msgId, 0, { ...cloneMessageStream([streamClone[msgId]])[0], id: makeId("msg") });
-    }
-    return streamClone;
-}
-
-function mutateMessage(msg: Message) {
-    const operation = Math.random();
-    if (msg.type === "vote") {
-        // change poll reference or option index
-        const customOrig = msg.custom as unknown;
-        const customRec: Record<string, unknown> = customOrig && typeof customOrig === "object" && !Array.isArray(customOrig) ? { ...(customOrig as Record<string, unknown>) } : {};
-        if (operation > 0.5) 
-            customRec.pollId = makeId("poll", true);
-        else 
-            customRec.optionIndex = Math.max(0, (typeof customRec.optionIndex === "number" ? (customRec.optionIndex as number) : 0) + (Math.random() > 0.5 ? 1 : -1));
-        
-        msg.custom = customRec as unknown;
-    } else if (msg.type === "createPoll") {
-        const customOrig = msg.custom as unknown;
-        const customRec: Record<string, unknown> = customOrig && typeof customOrig === "object" && !Array.isArray(customOrig) ? { ...(customOrig as Record<string, unknown>) } : {};
-        if (operation > 0.5) 
-            customRec.options = [...((customRec.options as unknown[]) ?? []), "extra"];
-        msg.custom = customRec as unknown;
-    } else {
-        // tweak text
-        msg.text = (msg.text ?? "") + (operation > 0.6 ? "!" : "");
-    }
-}
-
-function crossover(a: Message[], b: Message[]): Message[] {
-    if (a.length === 0 || b.length === 0) 
-        return cloneMessageStream(Math.random() > 0.5 ? a : b);
-
-    const cutA = Math.floor(Math.random() * a.length);
-    const cutB = Math.floor(Math.random() * b.length);
-    const child = cloneMessageStream(a.slice(0, cutA).concat(b.slice(cutB)));
-    
-    return child;
-}
-
-export function generatePollMessageStream(poll: PollCustom, actions: Action[], options?: FuzzOptions): Message[] {
+export async function generatePollMessageStream(ctx: DemoScriptContext, personas: string[], actions: Action<Input, Output, ConstraintInput>[], options?: FuzzOptions): Promise<void> {
     const opts = { ...DEFAULT_OPTIONS, ...(options ?? {}) } as Required<FuzzOptions>;
 
-    // initialize population
-    const population: Message[][] = [];
-    for (let i = 0; i < opts.population; i++) 
-        population.push(randomInitial(opts.maxLength, poll.prompt, poll.options.map(o => o.id)));
-
-    let best: Message[] = population[0];
-    let bestScore = fitness(best, actions);
-
-    for (let gen = 0; gen < opts.generations; gen++) {
-        // score all
-        const scored = population.map((individual) => ({ individual: individual, score: fitness(individual, actions) }));
-        scored.sort((a, b) => b.score - a.score);
-        
-        if (scored[0].score > bestScore) {
-            best = cloneMessageStream(scored[0].individual);
-            bestScore = scored[0].score;
-        }
-
-        // produce next generation
-        const nextGen: Message[][] = [];
-        // keep top 2
-        nextGen.push(cloneMessageStream(scored[0].individual));
-        if (scored[1])
-            nextGen.push(cloneMessageStream(scored[1].individual));
-
-        while (nextGen.length < opts.population) {
-            const pA = scored[Math.floor(Math.random() * Math.min(scored.length, 10))].individual;
-            const pB = scored[Math.floor(Math.random() * Math.min(scored.length, 10))].individual;
-
-            let child = crossover(pA, pB);
-            if (Math.random() < 0.7) 
-                child = mutate(child, opts.maxLength, poll.prompt, poll.options.map(o => o.id));
-
-            nextGen.push(child);
-        }
-
-        for (let i = 0; i < population.length; i++) 
-            population[i] = nextGen[i];
-    }
-
-    // make timestamps monotonic
-    const out = cloneMessageStream(best);
-    const base = Date.now() - out.length * 1000;
-    for (let i = 0; i < out.length; i++) {
-        out[i].timestamp = new Date(base + i * 1000).toISOString();
-    }
-
-    return out;
+    const log: LogEntry<Input, Output>[] = await randomLog(personas, actions, opts.maxLength);
+    console.log("Generated log:", log);
 }

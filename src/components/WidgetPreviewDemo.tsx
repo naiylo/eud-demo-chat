@@ -1,102 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Message, Persona } from "../db/sqlite";
 import type { ChatWidgetDefinition } from "../widgets/types";
-import { generatePollMessageStream, isPreConditionInput, type PostConditionInput, type PreConditionInput } from "../generator/fuzzer";
-import { checkPostAddVote, checkPreAddVote, type PollActions } from "../exampleWidgets/examplepoll";
+import { generatePollActions, type Action} from "../generator/fuzzer";
+import { type ConstraintInput, type PollActionInput } from "../exampleWidgets/examplepoll";
 
 const PREVIEW_PERSONAS: Persona[] = [
   { id: "designer", name: "Oskar", color: "#e86a92", bio: "" },
   { id: "engineer", name: "Sebastian", color: "#0075ff", bio: "" },
   { id: "chief", name: "Tom", color: "#00a676", bio: "" },
 ];
-
-const SAMPLE_STREAMS: Record<string, Message[]> = {
-  message: [
-    {
-      id: "m-demo-1",
-      authorId: "designer",
-      text: "Designer kicks off with a warm hello.",
-      timestamp: new Date().toISOString(),
-      type: "message",
-      custom: [],
-    },
-    {
-      id: "m-demo-2",
-      authorId: "engineer",
-      text: "Engineer replies and acknowledges the brief.",
-      timestamp: new Date().toISOString(),
-      type: "message",
-      custom: [],
-    },
-    {
-      id: "m-demo-3",
-      authorId: "pm",
-      text: "PM confirms the handoff and next steps.",
-      timestamp: new Date().toISOString(),
-      type: "message",
-      custom: [],
-    },
-  ],
-  createPoll: generatePollMessageStream({
-      prompt: "What should we have for lunch?",
-      options: [
-        {
-          id: "option-1",
-          label: "Pizza",
-        },
-        {
-          id: "option-2",
-          label: "Sushi",
-        },
-        {
-          id: "option-3",
-          label: "Salad",
-        },
-        {
-          id: "option-4",
-          label: "Burgers",
-        },
-      ]
-  },[
-      {
-          name: "createPoll",
-          description: "Creating a poll",
-          preConditions: [],
-          postConditions: [],
-      },
-      {
-          name: "addVote",
-          description: "Voting in a poll",
-          preConditions: [ 
-              {
-                  name: "Poll exists",
-                  description: "The poll being voted on must exist in the message stream",
-                  validate: (input: PreConditionInput | PostConditionInput) => {
-                      if (isPreConditionInput(input)) {
-                          const { stream, pollId, authorId } = input as PreConditionInput;
-                          return checkPreAddVote(stream, pollId, authorId);
-                      }
-                      return false;
-                  }
-              }
-          ],
-          postConditions: [
-              {
-                  name: "Vote counted",
-                  description: "After voting, the vote should be counted in the poll results",
-                  validate: (input: PreConditionInput | PostConditionInput) => {
-                      if (!isPreConditionInput(input)) {
-                          const { prevMessages, nextMessages, pollId, authorId } = input as PostConditionInput;
-                          return checkPostAddVote(prevMessages, nextMessages, pollId, authorId);
-                      }
-                      return false;
-                  }
-              }
-          ],
-      }
-  ],
-  { population: 10, generations: 15, maxLength: 30 }),
-};
 
 const DEMO_VARIANTS = [
   {
@@ -175,44 +87,25 @@ export type DemoScriptContext = {
 const DEMO_SCRIPTS: Record<string, (ctx: DemoScriptContext) => Promise<void>> =
   {
     createPoll: async ({ actions, wait, getMessages }) => {
-      const pollActions = actions as PollActions;
+      const pollActions = actions as Action<PollActionInput, ConstraintInput>[];
+      const addVoteAction = pollActions.find((a) => a.name === "addVote");
+      const deleteVoteAction = pollActions.find((a) => a.name === "deleteVote");
+      const createPollAction = pollActions.find((a) => a.name === "createPoll");
       if (
-        !pollActions.createPoll ||
-        !pollActions.addVote ||
-        !pollActions.deleteVote
+        !createPollAction ||
+        !addVoteAction ||
+        !deleteVoteAction
       ) {
         console.warn("Poll demo missing required actions");
         return;
       }
-      const prompt = "Product direction";
-      const options = [
-        { id: "opt-preview-a", label: "Ship MVP" },
-        { id: "opt-preview-b", label: "Polish for two more weeks" },
-      ];
-
-      const createdId = await pollActions.createPoll(
-        { prompt, options },
-        "engineer"
+      await generatePollActions(
+        { actions, wait, getMessages },
+        PREVIEW_PERSONAS.map((p) => p.id),
+        pollActions
+      ).catch((err) =>
+        console.error("Error running poll demo script:", err)
       );
-      const pollId =
-        createdId ??
-        getMessages().find(
-          (m) =>
-            m.type === "createPoll" &&
-            typeof (m.custom as any)?.prompt === "string" &&
-            (m.custom as any).prompt === prompt
-        )?.id;
-      if (!pollId) return;
-
-      await wait(2000);
-      await pollActions.addVote(pollId, "opt-preview-a", "engineer");
-      await wait(2000);
-      await pollActions.addVote(pollId, "opt-preview-b", "designer");
-      await wait(2000);
-      await pollActions.addVote(pollId, "opt-preview-a", "chief");
-      await wait(2000);
-      await pollActions.deleteVote(pollId, "designer");
-      await wait(2000);
     },
   };
 

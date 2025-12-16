@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Message, Persona } from "../db/sqlite";
+import { clearMessages } from "../db/sqlite";
 import type { ChatWidgetDefinition } from "../widgets/types";
 
 const PREVIEW_PERSONAS: Persona[] = [
@@ -302,13 +303,10 @@ export function WidgetPreviewDemo({
   const messagesRef = useRef<Message[]>([]);
   const [actions, setActions] = useState<DemoActionImpact[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const isRunningRef = useRef(false);
   const [streamIndex, setStreamIndex] = useState(0);
   const [switchNotice, setSwitchNotice] = useState<string | null>(null);
   const [acceptedStreamId, setAcceptedStreamId] = useState<string | null>(null);
-  const inFlightStreamsRef = useRef<Set<string>>(new Set());
-  const streamSnapshotsRef = useRef<
-    Map<string, { messages: Message[]; actions: DemoActionImpact[] }>
-  >(new Map());
 
   messagesRef.current = messages;
 
@@ -438,12 +436,19 @@ export function WidgetPreviewDemo({
   const canRunScript = Boolean(activeStream);
 
   const runSampleTrace = useCallback(async () => {
-    if (!activeStream || isRunning) return;
+    if (!activeStream || isRunningRef.current) return;
 
+    isRunningRef.current = true;
     setIsRunning(true);
+    messagesRef.current = [];
     setMessages([]);
     setActions([]);
     setAcceptedStreamId(null);
+    try {
+      await clearMessages();
+    } catch (err) {
+      console.error("Failed to clear demo database", err);
+    }
 
     const script = activeStream?.run;
     if (script) {
@@ -460,45 +465,27 @@ export function WidgetPreviewDemo({
       }
     }
 
+    isRunningRef.current = false;
     setIsRunning(false);
-  }, [activeStream, observedActions, isRunning]);
+  }, [activeStream, observedActions]);
 
-  // Load cached stream snapshot or run once to create it.
   useEffect(() => {
     if (!activeStream) return;
-    const cached = streamSnapshotsRef.current.get(activeStream.id);
-    if (cached) {
-      setMessages(cached.messages);
-      setActions(cached.actions);
-      setSwitchNotice(null);
-      setAcceptedStreamId(null);
-      return;
-    }
-    if (inFlightStreamsRef.current.has(activeStream.id)) return;
-    inFlightStreamsRef.current.add(activeStream.id);
+    messagesRef.current = [];
     setMessages([]);
     setActions([]);
     setSwitchNotice(null);
     setAcceptedStreamId(null);
-    runSampleTrace().finally(() => {
-      inFlightStreamsRef.current.delete(activeStream.id);
-    });
+    runSampleTrace();
   }, [activeStream, runSampleTrace]);
-
-  // Cache latest results per stream so they stay static after first creation.
-  useEffect(() => {
-    if (!activeStream) return;
-    streamSnapshotsRef.current.set(activeStream.id, {
-      messages: messagesRef.current,
-      actions,
-    });
-  }, [activeStream, actions]);
 
   useEffect(() => {
     setStreamIndex(0);
     setSwitchNotice(null);
     setAcceptedStreamId(null);
-    streamSnapshotsRef.current.clear();
+    messagesRef.current = [];
+    setMessages([]);
+    setActions([]);
   }, [widget.type]);
 
   const handleAccept = () => {
@@ -849,7 +836,10 @@ export function WidgetPreviewDemo({
                   className="analytics-secondary"
                   onClick={handleContinue}
                   disabled={
-                    !activeStream || streamList.length <= 1 || isLastStream
+                    !activeStream ||
+                    streamList.length <= 1 ||
+                    isLastStream ||
+                    isRunning
                   }
                 >
                   Continue

@@ -87,10 +87,13 @@ export type DemoScriptContext = {
 const DEMO_SCRIPTS: Record<string, (ctx: DemoScriptContext) => Promise<void>> =
   {
     createPoll: async ({ actions, wait, getMessages }) => {
-      const pollActions = actions as Action<PollActionInput, ConstraintInput>[];
-      const addVoteAction = pollActions.find((a) => a.name === "addVote");
-      const deleteVoteAction = pollActions.find((a) => a.name === "deleteVote");
-      const createPollAction = pollActions.find((a) => a.name === "createPoll");
+      const pollActions = actions as { [key: string]: Action<
+        PollActionInput,
+        ConstraintInput
+      >};
+      const addVoteAction =  pollActions["addVote"];
+      const deleteVoteAction = pollActions["deleteVote"];
+      const createPollAction = pollActions["createPoll"];
       if (
         !createPollAction ||
         !addVoteAction ||
@@ -102,7 +105,7 @@ const DEMO_SCRIPTS: Record<string, (ctx: DemoScriptContext) => Promise<void>> =
       await generatePollActions(
         { actions, wait, getMessages },
         PREVIEW_PERSONAS.map((p) => p.id),
-        pollActions
+        [createPollAction, addVoteAction, deleteVoteAction]
       ).catch((err) =>
         console.error("Error running poll demo script:", err)
       );

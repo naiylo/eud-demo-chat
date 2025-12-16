@@ -72,32 +72,40 @@ async function randomLog(personas: string[], actions: Action<PollActionInput, Co
             const who = personas[Math.floor(Math.random() * personas.length)];
             const pick = Math.random();
             const entry = pick < 0.5 ? await createPoll(actions, who) : await createVote(actions, who);
+            console.log("Generated entry:", entry);
 
             if (entry) {
                 const action = actions.find((act) => act.name === entry?.action);
                 failedPreCondition = !action?.preConditions.every((constraint) =>
                     constraint.validate({
                         previousAction: [...stream, entry], 
-                        nextActions: [], 
+                        nextActions: [],
                         data: { 
                             authorId: entry.input.authorId, 
                             pollId: isCreatePollActionInput(entry) ? (entry.input as CreatePollActionInput).id : (entry.input as AddVoteActionInput | DeleteVoteActionInput).pollId 
                         } 
-                    })) || false;
-
-                for (let j = 0; j < i; j++) {
-                    for (const action of actions) {
-                        failedPostCondition = !action?.postConditions.every((constraint) => 
-                            constraint.validate({ 
-                                previousAction: stream.slice(0, j), 
-                                nextActions: [...stream.slice(j), entry], 
-                                data: { 
-                                    authorId: entry.input.authorId,
-                                    pollId: isCreatePollActionInput(entry) ? (entry.input as CreatePollActionInput).id : (entry.input as AddVoteActionInput | DeleteVoteActionInput).pollId 
-                                } 
-                            }));
                     }
+                ));
+                console.log("PreCondition check:", failedPreCondition);
+                if (action?.postConditions.length || 0 > 0) {
+                    for (let j = 0; j < i; j++) {
+                        for (const action of actions) {
+                            failedPostCondition = !action?.postConditions.every((constraint) => 
+                                constraint.validate({ 
+                                    previousAction: stream.slice(0, j), 
+                                    nextActions: [...stream.slice(j), entry], 
+                                    data: { 
+                                        authorId: entry.input.authorId,
+                                        pollId: isCreatePollActionInput(entry) ? (entry.input as CreatePollActionInput).id : (entry.input as AddVoteActionInput | DeleteVoteActionInput).pollId 
+                                    } 
+                                }
+                            ));
+                        }
+                    }
+                } else {
+                    failedPostCondition = false;
                 }
+                
                 result = entry;
             }
         }
@@ -108,6 +116,7 @@ async function randomLog(personas: string[], actions: Action<PollActionInput, Co
 }
 
 export async function generatePollActions(ctx: DemoScriptContext, personas: string[], actions: Action<PollActionInput, ConstraintInput>[]): Promise<void> {
+    console.log(actions);
     const log: LogEntry<PollActionInput>[] = await randomLog(personas, actions, 20);
     
     for (const entry of log) {

@@ -6,7 +6,7 @@ import type {
   WidgetComposerProps,
   WidgetRenderProps,
 } from "../widgets/types";
-import type { Action } from "../generator/fuzzer";
+import type { Action, ConditionInput, Constraint } from "../generator/fuzzer";
 
 type PollOption = { id: string; label: string };
 
@@ -89,6 +89,14 @@ export const isDeleteVoteActionInput = (input: unknown): input is DeleteVoteActi
     );
 }
 
+class CreatePollPreCondition implements Constraint<PollActionInput, ConstraintInput> {
+    name = "CreatePollPreCondition";
+    description = "No precondition for creating a poll";
+    validate(input: ConditionInput<PollActionInput, ConstraintInput>): boolean {
+        return true;
+    }
+}
+
 export type PollActionInput = CreatePollActionInput | AddVoteActionInput | DeleteVoteActionInput;
 
 function createActions({
@@ -100,7 +108,9 @@ function createActions({
   const createPoll: Action<PollActionInput, ConstraintInput> = {
     name: "createPoll",
     description: "Create a new poll with options",
-    preConditions: [],
+    preConditions: [
+      new CreatePollPreCondition()
+    ],
     postConditions: [],
     execute: async (input: CreatePollActionInput) => {
       if (!input.poll.prompt.trim() || input.poll.options.length < 2) return;

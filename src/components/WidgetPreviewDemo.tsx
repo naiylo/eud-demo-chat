@@ -50,9 +50,9 @@ class DemoDatabaseObserver {
     }) => void
   ) {}
 
-  wrap<T extends Record<string, any>>(actions: T): T {
+  wrap<T extends Action[]>(actions: T): T {
     const wrapped: Record<string, any> = {};
-    Object.entries(actions).forEach(([key, value]) => {
+    actions.forEach((action) => {
       if (typeof value !== "function") {
         wrapped[key] = value;
         return;

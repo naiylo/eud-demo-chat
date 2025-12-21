@@ -1,32 +1,32 @@
 import type { DemoScriptContext } from "../components/WidgetPreviewDemo";
-import { isAddVoteActionInput, isCreatePollActionInput, type AddVoteActionInput,type ConstraintInput, type CreatePollActionInput, type DeleteVoteActionInput, type PollActionInput } from "../exampleWidgets/examplepoll";
+import { isAddVoteActionInput, isCreatePollActionInput } from "../exampleWidgets/examplepoll";
 
-export type ConditionInput<I, D> = {
-    previousAction: LogEntry<I>[];
-    nextActions: LogEntry<I>[];
-    data: D;
+export type ConditionInput = {
+    previousAction: LogEntry[];
+    nextActions: LogEntry[];
+    data: Record<string, unknown>;
 }
 
-type LogEntry<I> = {
+type LogEntry = {
     action: string;
-    input: I;
+    input: Record<string, unknown>;
 }
 
-export function isPreConditionInput(input: ConditionInput<unknown, unknown>): input is ConditionInput<unknown, unknown> {
-    return (input as ConditionInput<unknown, unknown>).previousAction !== undefined;
+export function isPreConditionInput(input: ConditionInput): input is ConditionInput {
+    return (input as ConditionInput).previousAction !== undefined;
 }
-export interface Constraint<I, D> {
+export interface Constraint {
     name: string;
     description: string;
-    validate: (input: ConditionInput<I, D>) => boolean;
+    validate: (input: ConditionInput) => boolean;
 }
 
-export interface Action<I, D> {
+export interface Action {
     name: string;
     description: string;
-    execute(input: I): Promise<void>;
-    preConditions: Constraint<I, D>[];
-    postConditions: Constraint<I, D>[];
+    execute(input: Record<string, unknown>): Promise<void>;
+    preConditions: Constraint[];
+    postConditions: Constraint[];
 }
 
 type Poll = {
@@ -36,7 +36,7 @@ type Poll = {
 
 const polls: Poll[] = [];
 
-async function createPoll(actions: Action<PollActionInput, ConstraintInput>[], creatorId: string): Promise<LogEntry<PollActionInput> | undefined> {
+async function createPoll(actions: Action[], creatorId: string): Promise<LogEntry | undefined> {
     const action = actions.find(a => a.name === "createPoll");
     if (isCreatePollActionInput(action)) {
         const options = [];
@@ -50,7 +50,7 @@ async function createPoll(actions: Action<PollActionInput, ConstraintInput>[], c
     }
 }
 
-async function createVote(actions: Action<PollActionInput, ConstraintInput>[], authorId: string, pollId?: string, optionIndex?: number): Promise<LogEntry<PollActionInput> | undefined> {
+async function createVote(actions: Action[], authorId: string, pollId?: string, optionIndex?: number): Promise<LogEntry | undefined> {
     const action = actions.find(a => a.name === "addVote");
     if (isAddVoteActionInput(action)) {
         const votePoll = pollId ? polls.find(p => p.id === pollId) : polls[Math.floor(Math.random() * polls.length)];
@@ -61,13 +61,13 @@ async function createVote(actions: Action<PollActionInput, ConstraintInput>[], a
     }
 }
 
-async function randomLog(personas: string[], actions: Action<PollActionInput, ConstraintInput>[], maxLen: number): Promise<LogEntry<PollActionInput>[]> {
+async function randomLog(personas: string[], actions: Action[], maxLen: number): Promise<LogEntry[]> {
     const len = 3 + Math.floor(Math.random() * Math.min(12, maxLen));
-    const stream: LogEntry<PollActionInput>[] = [];
+    const stream: LogEntry[] = [];
     for (let i = 0; i < len; i++) {
         let failedPreCondition = true;
         let failedPostCondition = true;
-        let result: LogEntry<PollActionInput> | undefined = undefined;
+        let result: LogEntry | undefined = undefined;
         while (failedPreCondition || failedPostCondition) {
             const who = personas[Math.floor(Math.random() * personas.length)];
             const pick = Math.random();
@@ -80,10 +80,7 @@ async function randomLog(personas: string[], actions: Action<PollActionInput, Co
                     constraint.validate({
                         previousAction: [...stream, entry], 
                         nextActions: [],
-                        data: { 
-                            authorId: entry.input.authorId, 
-                            pollId: isCreatePollActionInput(entry) ? (entry.input as CreatePollActionInput).id : (entry.input as AddVoteActionInput | DeleteVoteActionInput).pollId 
-                        } 
+                        data: entry.input
                     }
                 ));
                 console.log("PreCondition check:", failedPreCondition);
@@ -94,10 +91,7 @@ async function randomLog(personas: string[], actions: Action<PollActionInput, Co
                                 constraint.validate({ 
                                     previousAction: stream.slice(0, j), 
                                     nextActions: [...stream.slice(j), entry], 
-                                    data: { 
-                                        authorId: entry.input.authorId,
-                                        pollId: isCreatePollActionInput(entry) ? (entry.input as CreatePollActionInput).id : (entry.input as AddVoteActionInput | DeleteVoteActionInput).pollId 
-                                    } 
+                                    data: entry.input
                                 }
                             ));
                         }
@@ -115,9 +109,9 @@ async function randomLog(personas: string[], actions: Action<PollActionInput, Co
     return stream;
 }
 
-export async function generatePollActions(ctx: DemoScriptContext, personas: string[], actions: Action<PollActionInput, ConstraintInput>[]): Promise<void> {
+export async function generatePollActions(ctx: DemoScriptContext, personas: string[], actions: Action[]): Promise<void> {
     console.log(actions);
-    const log: LogEntry<PollActionInput>[] = await randomLog(personas, actions, 20);
+    const log: LogEntry[] = await randomLog(personas, actions, 20);
     
     for (const entry of log) {
         const action = actions.find(a => a.name === entry.action);

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ChatWidgetDefinition, WidgetActionMap } from "../widgets/types";
 import { AddWidget } from "./AddWidget";
+import { WidgetDemoTab } from "./WidgetDemoTab";
 
 export function WidgetWorkbench({
   open,
@@ -15,11 +16,13 @@ export function WidgetWorkbench({
   widgetActions: WidgetActionMap;
   selectedAuthorId: string;
 }) {
+  const ADD_WIDGET_KEY = "addWidget";
+  const DEMO_TAB_KEY = "__demo__";
   const composerWidgets = widgets.filter(
     (w) => w.elements?.composer ?? (w as any)?.composer
   );
   const defaultKey =
-    composerWidgets[0]?.registryName ?? composerWidgets[0]?.type ?? "addWidget";
+    composerWidgets[0]?.registryName ?? composerWidgets[0]?.type ?? ADD_WIDGET_KEY;
   const [mode, setMode] = useState<string>(defaultKey);
   const [removeNotice, setRemoveNotice] = useState<string>("");
 
@@ -30,11 +33,15 @@ export function WidgetWorkbench({
   );
 
   const modalClass =
-    "workbench-modal" + (mode === "addWidget" ? " workbench-modal--wide" : "");
+    "workbench-modal" +
+    (mode === ADD_WIDGET_KEY ? " workbench-modal--wide" : "");
 
   const renderComposer = () => {
-    if (mode === "addWidget") {
-      return <AddWidget widgets={widgets} />;
+    if (mode === ADD_WIDGET_KEY) {
+      return <AddWidget />;
+    }
+    if (mode === DEMO_TAB_KEY) {
+      return <WidgetDemoTab widgets={widgets} />;
     }
     if (!currentComposer) return null;
 
@@ -90,11 +97,20 @@ export function WidgetWorkbench({
             <button
               type="button"
               className={`pill-toggle ${
-                mode === "addWidget" ? "pill-toggle--active" : ""
+                mode === ADD_WIDGET_KEY ? "pill-toggle--active" : ""
               }`}
-              onClick={() => setMode("addWidget")}
+              onClick={() => setMode(ADD_WIDGET_KEY)}
             >
               +
+            </button>
+            <button
+              type="button"
+              className={`pill-toggle ${
+                mode === DEMO_TAB_KEY ? "pill-toggle--active" : ""
+              }`}
+              onClick={() => setMode(DEMO_TAB_KEY)}
+            >
+              Demo
             </button>
             {composerWidgets.map((w) => (
               <div

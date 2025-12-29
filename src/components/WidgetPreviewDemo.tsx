@@ -1,266 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Message, Persona } from "../db/sqlite";
-import { clearMessages } from "../db/sqlite";
 import type { ChatWidgetDefinition } from "../widgets/types";
-
-const PREVIEW_PERSONAS: Persona[] = [
-  { id: "designer", name: "Oskar", color: "#e86a92", bio: "" },
-  { id: "engineer", name: "Sebastian", color: "#0075ff", bio: "" },
-  { id: "chief", name: "Tom", color: "#00a676", bio: "" },
-];
-
-type DemoActionImpact = {
-  id: string;
-  action: string;
-  actors: string[];
-  added: Message[];
-  deleted: Message[];
-  beforeCount: number;
-  afterCount: number;
-  order: number;
-  timestamp: number;
-};
-
-type HeuristicRule = {
-  id: string;
-  label: string;
-  severity: "warn" | "weird";
-  evaluate: (action: DemoActionImpact) => { hit: boolean; detail?: string };
-};
-
-type HeuristicFinding = {
-  id: string;
-  ruleId: string;
-  label: string;
-  severity: "warn" | "weird";
-  detail?: string;
-  actionId: string;
-  actionOrder: number;
-};
-
-const HEURISTIC_RULES: HeuristicRule[] = [
-  {
-    id: "deleteVote-multi",
-    label: "deleteVote removed multiple votes",
-    severity: "weird",
-    evaluate: (action) => {
-      const removedVotes = action.deleted.filter(
-        (m) => m.type === "vote"
-      ).length;
-      return {
-        hit: action.action === "deleteVote" && removedVotes > 1,
-        detail: `Removed ${removedVotes} vote messages`,
-      };
-    },
-  },
-  {
-    id: "addVote-noop",
-    label: "addVote executed without DB change",
-    severity: "warn",
-    evaluate: (action) => ({
-      hit:
-        action.action === "addVote" &&
-        action.added.length === 0 &&
-        action.deleted.length === 0,
-      detail: "Action returned but did not persist a vote",
-    }),
-  },
-  {
-    id: "createPoll-multi",
-    label: "createPoll produced multiple records",
-    severity: "warn",
-    evaluate: (action) => {
-      const pollsCreated = action.added.filter(
-        (m) => m.type === "createPoll"
-      ).length;
-      return {
-        hit: action.action === "createPoll" && pollsCreated > 1,
-        detail: `Created ${pollsCreated} poll payloads`,
-      };
-    },
-  },
-];
-
-type DemoScriptContext = {
-  actions: unknown;
-  wait: (ms: number) => Promise<void>;
-  getMessages: () => Message[];
-};
-
-type DemoStream = {
-  id: string;
-  run: (context: DemoScriptContext) => Promise<void>;
-};
-
-const DEMO_STREAMS: Record<string, DemoStream[]> = {
-  createPoll: [
-    {
-      id: "one-poll",
-      run: async ({ actions, wait, getMessages }) => {
-        const pollActions = actions as {
-          createPoll?: (
-            poll: { prompt: string; options: { id: string; label: string }[] },
-            authorId: string
-          ) => Promise<string | undefined>;
-          addVote?: (
-            pollId: string,
-            optionId: string,
-            authorId: string
-          ) => Promise<void>;
-          deleteVote?: (pollId: string, authorId: string) => Promise<void>;
-        };
-
-        const prompt = "Product direction";
-        const options = [
-          { id: "opt-preview-a", label: "Ship MVP" },
-          { id: "opt-preview-b", label: "Polish for two more weeks" },
-        ];
-
-        const createAndResolveId = async (
-          p: string,
-          opts: { id: string; label: string }[]
-        ) => {
-          const createdId = await pollActions.createPoll(
-            { prompt: p, options: opts },
-            "engineer"
-          );
-          return (
-            createdId ??
-            getMessages().find(
-              (m) =>
-                m.type === "createPoll" &&
-                typeof (m.custom as any)?.prompt === "string" &&
-                (m.custom as any).prompt === p
-            )?.id
-          );
-        };
-
-        const pollId = await createAndResolveId(prompt, options);
-
-        await pollActions.addVote(pollId, "opt-preview-a", "engineer");
-        await pollActions.addVote(pollId, "opt-preview-b", "designer");
-        await pollActions.addVote(pollId, "opt-preview-a", "chief");
-        await pollActions.deleteVote(pollId, "designer");
-      },
-    },
-    {
-      id: "two-polls",
-      run: async ({ actions, wait, getMessages }) => {
-        const pollActions = actions as {
-          createPoll?: (
-            poll: { prompt: string; options: { id: string; label: string }[] },
-            authorId: string
-          ) => Promise<string | undefined>;
-          addVote?: (
-            pollId: string,
-            optionId: string,
-            authorId: string
-          ) => Promise<void>;
-          deleteVote?: (pollId: string, authorId: string) => Promise<void>;
-        };
-
-        const prompt = "Product direction";
-        const options = [
-          { id: "opt-preview-a", label: "Ship MVP" },
-          { id: "opt-preview-b", label: "Polish for two more weeks" },
-        ];
-
-        const prompt2 = "Design direction";
-        const options2 = [
-          { id: "opt-preview-c", label: "Keep current look" },
-          { id: "opt-preview-d", label: "Refresh theme" },
-        ];
-
-        const createAndResolveId = async (
-          p: string,
-          opts: { id: string; label: string }[]
-        ) => {
-          const createdId = await pollActions.createPoll(
-            { prompt: p, options: opts },
-            "engineer"
-          );
-          return (
-            createdId ??
-            getMessages().find(
-              (m) =>
-                m.type === "createPoll" &&
-                typeof (m.custom as any)?.prompt === "string" &&
-                (m.custom as any).prompt === p
-            )?.id
-          );
-        };
-
-        const pollId = await createAndResolveId(prompt, options);
-        const pollId2 = await createAndResolveId(prompt2, options2);
-
-        await pollActions.addVote(pollId, "opt-preview-a", "engineer");
-        await pollActions.addVote(pollId, "opt-preview-b", "designer");
-        await pollActions.addVote(pollId, "opt-preview-a", "chief");
-        await pollActions.addVote(pollId2, "opt-preview-d", "designer");
-        await pollActions.addVote(pollId2, "opt-preview-d", "chief");
-        await pollActions.deleteVote(pollId, "designer");
-      },
-    },
-  ],
-};
-
-class DemoDatabaseObserver {
-  private getSnapshot: () => Message[];
-  private onChange: (info: {
-    action: string;
-    added: Message[];
-    deleted: Message[];
-    beforeCount: number;
-    afterCount: number;
-  }) => void;
-
-  constructor(
-    getSnapshot: () => Message[],
-    onChange: (info: {
-      action: string;
-      added: Message[];
-      deleted: Message[];
-      beforeCount: number;
-      afterCount: number;
-    }) => void
-  ) {
-    this.getSnapshot = getSnapshot;
-    this.onChange = onChange;
-  }
-
-  wrap<T extends Record<string, any>>(actions: T): T {
-    const wrapped: Record<string, any> = {};
-
-    Object.entries(actions).forEach(([key, value]) => {
-      if (typeof value !== "function") {
-        wrapped[key] = value;
-        return;
-      }
-
-      wrapped[key] = async (...args: any[]) => {
-        const before = this.getSnapshot();
-        const result = await value(...args);
-        await Promise.resolve();
-        const after = this.getSnapshot();
-
-        const added = after.filter((a) => !before.some((b) => b.id === a.id));
-        const deleted = before.filter((b) => !after.some((a) => a.id === b.id));
-
-        this.onChange({
-          action: key,
-          added,
-          deleted,
-          beforeCount: before.length,
-          afterCount: after.length,
-        });
-
-        return result;
-      };
-    });
-
-    return wrapped as T;
-  }
-}
+import {
+  DEMO_STREAMS,
+  HEURISTIC_RULES,
+  PREVIEW_PERSONAS,
+  DemoDatabaseObserver,
+  evaluateHeuristicFindings,
+} from "../widgets/demoDiagnostics";
+import type {
+  DemoActionImpact,
+  HeuristicFinding,
+} from "../widgets/demoDiagnostics";
 
 const summarizeTypes = (messages: Message[]) => {
   const counts = messages.reduce<Record<string, number>>((acc, msg) => {
@@ -290,6 +41,9 @@ export function WidgetPreviewDemo({
   onClose,
   onOpenDatabaseView,
   onOpenUserDemo,
+  streamFilter,
+  initialStreamId,
+  activeRuleIds,
 }: {
   widget: ChatWidgetDefinition;
   onClose: () => void;
@@ -298,6 +52,9 @@ export function WidgetPreviewDemo({
     actions: DemoActionImpact[];
   }) => void;
   onOpenUserDemo?: () => void;
+  streamFilter?: string[];
+  initialStreamId?: string;
+  activeRuleIds?: string[];
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const messagesRef = useRef<Message[]>([]);
@@ -311,22 +68,24 @@ export function WidgetPreviewDemo({
   messagesRef.current = messages;
 
   const renderer = widget.elements?.render ?? (widget as any)?.render;
-  const streamList = useMemo(
-    () => DEMO_STREAMS[widget.type] ?? [],
-    [widget.type]
-  );
+  const streamList = useMemo(() => {
+    const streams = DEMO_STREAMS[widget.type] ?? [];
+    if (!streamFilter?.length) return streams;
+    return streams.filter((stream) => streamFilter.includes(stream.id));
+  }, [widget.type, streamFilter]);
   const activeStream = streamList[streamIndex];
   const isLastStream =
     streamList.length > 0 && streamIndex === streamList.length - 1;
 
   const observedActions = useMemo(() => {
-    const syncSetMessages: typeof setMessages = (updater) =>
-      setMessages((prev) => {
-        const next =
-          typeof updater === "function" ? (updater as any)(prev) : updater;
-        messagesRef.current = next;
-        return next;
-      });
+    const syncSetMessages: typeof setMessages = (updater) => {
+      const next =
+        typeof updater === "function"
+          ? (updater as (prev: Message[]) => Message[])(messagesRef.current)
+          : updater;
+      messagesRef.current = next;
+      setMessages(next);
+    };
 
     const observer = new DemoDatabaseObserver(
       () => messagesRef.current,
@@ -380,24 +139,16 @@ export function WidgetPreviewDemo({
     return map;
   }, [actions]);
 
-  const heuristicFindings = useMemo(() => {
-    return actions.flatMap(
-      (action) =>
-        HEURISTIC_RULES.map((rule) => {
-          const result = rule.evaluate(action);
-          if (!result.hit) return null;
-          return {
-            id: `${rule.id}-${action.id}`,
-            ruleId: rule.id,
-            label: rule.label,
-            severity: rule.severity,
-            detail: result.detail,
-            actionId: action.id,
-            actionOrder: action.order,
-          } as HeuristicFinding;
-        }).filter(Boolean) as HeuristicFinding[]
-    );
-  }, [actions]);
+  const heuristicFindings = useMemo(
+    () => evaluateHeuristicFindings(actions, activeRuleIds),
+    [actions, activeRuleIds]
+  );
+
+  const visibleHeuristicRules = useMemo(() => {
+    if (!activeRuleIds) return HEURISTIC_RULES;
+    const activeRuleSet = new Set(activeRuleIds);
+    return HEURISTIC_RULES.filter((rule) => activeRuleSet.has(rule.id));
+  }, [activeRuleIds]);
 
   const heuristicsByAction = useMemo(() => {
     const map = new Map<string, HeuristicFinding[]>();
@@ -444,11 +195,6 @@ export function WidgetPreviewDemo({
     setMessages([]);
     setActions([]);
     setAcceptedStreamId(null);
-    try {
-      await clearMessages();
-    } catch (err) {
-      console.error("Failed to clear demo database", err);
-    }
 
     const script = activeStream?.run;
     if (script) {
@@ -480,13 +226,29 @@ export function WidgetPreviewDemo({
   }, [activeStream, runSampleTrace]);
 
   useEffect(() => {
+    if (!streamList.length) {
+      setStreamIndex(0);
+      return;
+    }
+    if (initialStreamId) {
+      const nextIndex = streamList.findIndex(
+        (stream) => stream.id === initialStreamId
+      );
+      if (nextIndex >= 0) {
+        setStreamIndex(nextIndex);
+        return;
+      }
+    }
     setStreamIndex(0);
+  }, [streamList, initialStreamId]);
+
+  useEffect(() => {
     setSwitchNotice(null);
     setAcceptedStreamId(null);
     messagesRef.current = [];
     setMessages([]);
     setActions([]);
-  }, [widget.type]);
+  }, [widget.type, streamList, initialStreamId]);
 
   const handleAccept = () => {
     if (!activeStream) return;
@@ -678,14 +440,20 @@ export function WidgetPreviewDemo({
               </div>
 
               <div className="heuristic-rules__list">
-                {HEURISTIC_RULES.map((rule) => (
-                  <div key={rule.id} className="heuristic-rule">
-                    <span className="widget-pill">
-                      {rule.severity === "weird" ? "alert" : "warn"}
-                    </span>
-                    {rule.label}
-                  </div>
-                ))}
+                {visibleHeuristicRules.length === 0 ? (
+                  <p className="analytics-placeholder">
+                    No heuristics selected.
+                  </p>
+                ) : (
+                  visibleHeuristicRules.map((rule) => (
+                    <div key={rule.id} className="heuristic-rule">
+                      <span className="widget-pill">
+                        {rule.severity === "weird" ? "alert" : "warn"}
+                      </span>
+                      {rule.label}
+                    </div>
+                  ))
+                )}
               </div>
 
               <div className="heuristic-findings">

@@ -71,7 +71,8 @@ export const HEURISTIC_RULES: HeuristicRule[] = [
       hit:
         action.action === "addVote" &&
         action.added.length === 0 &&
-        action.deleted.length === 0,
+        action.deleted.length === 0 &&
+        action.beforeCount === action.afterCount,
       detail: "Action returned but did not persist a vote",
     }),
   },
@@ -199,6 +200,7 @@ export const DEMO_STREAMS: Record<string, DemoStream[]> = {
         };
 
         const pollId = await createAndResolveId(prompt, options);
+        await wait(5);
         const pollId2 = await createAndResolveId(prompt2, options2);
 
         await wait(5);

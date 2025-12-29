@@ -22,7 +22,9 @@ export function WidgetWorkbench({
     (w) => w.elements?.composer ?? (w as any)?.composer
   );
   const defaultKey =
-    composerWidgets[0]?.registryName ?? composerWidgets[0]?.type ?? ADD_WIDGET_KEY;
+    composerWidgets[0]?.registryName ??
+    composerWidgets[0]?.type ??
+    ADD_WIDGET_KEY;
   const [mode, setMode] = useState<string>(defaultKey);
   const [removeNotice, setRemoveNotice] = useState<string>("");
 
@@ -101,7 +103,7 @@ export function WidgetWorkbench({
               }`}
               onClick={() => setMode(ADD_WIDGET_KEY)}
             >
-              +
+              ➕
             </button>
             <button
               type="button"
@@ -110,7 +112,7 @@ export function WidgetWorkbench({
               }`}
               onClick={() => setMode(DEMO_TAB_KEY)}
             >
-              Demo
+              🔎
             </button>
             {composerWidgets.map((w) => (
               <div

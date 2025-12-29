@@ -2,7 +2,10 @@
 @import "./base.css";
 @import "./layout.css";
 @import "./sidebar.css";
-@import "./workbench.css";
+@import "./components/WidgetWorkbench.css";
+@import "./components/AddWidget.css";
+@import "./components/WidgetDemoTab.css";
+@import "./components/WidgetPreviewDemo.css";
 @import "./chat-window.css";
 @import "./message.css";
 @import "./data-panel.css";

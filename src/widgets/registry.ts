@@ -1,6 +1,8 @@
 import type { AnyWidgetDefinition } from "./types";
-import { examplepoll } from "./examplepoll";
+import { StandardPoll } from "./StandardPoll";
+import { PollBrokenDeleteVoteFunction } from "./PollBrokenDeleteVoteFunction";
 
 export const widgetRegistry: AnyWidgetDefinition[] = [
-  examplepoll,
+  StandardPoll,
+  PollBrokenDeleteVoteFunction,
 ];

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ChatWidgetDefinition, WidgetActionMap } from "../widgets/types";
 import { AddWidget } from "./AddWidget";
+import { WidgetDemoTab } from "./WidgetDemoTab";
 
 export function WidgetWorkbench({
   open,
@@ -15,28 +16,41 @@ export function WidgetWorkbench({
   widgetActions: WidgetActionMap;
   selectedAuthorId: string;
 }) {
+  const ADD_WIDGET_KEY = "addWidget";
+  const DEMO_TAB_KEY = "__demo__";
   const composerWidgets = widgets.filter(
     (w) => w.elements?.composer ?? (w as any)?.composer
   );
-  const [mode, setMode] = useState<string>("message");
+  const defaultKey =
+    composerWidgets[0]?.registryName ??
+    composerWidgets[0]?.type ??
+    ADD_WIDGET_KEY;
+  const [mode, setMode] = useState<string>(defaultKey);
   const [removeNotice, setRemoveNotice] = useState<string>("");
 
   if (!open) return null;
 
-  const currentComposer = composerWidgets.find((w) => w.type === mode);
+  const currentComposer = composerWidgets.find(
+    (w) => (w.registryName ?? w.type) === mode
+  );
 
   const modalClass =
-    "workbench-modal" + (mode === "addWidget" ? " workbench-modal--wide" : "");
+    "workbench-modal" +
+    (mode === ADD_WIDGET_KEY ? " workbench-modal--wide" : "");
 
   const renderComposer = () => {
-    if (mode === "addWidget") {
-      return <AddWidget widgets={widgets} />;
+    if (mode === ADD_WIDGET_KEY) {
+      return <AddWidget />;
+    }
+    if (mode === DEMO_TAB_KEY) {
+      return <WidgetDemoTab widgets={widgets} />;
     }
     if (!currentComposer) return null;
 
     if (!currentComposer.elements?.composer) return null;
+    const key = currentComposer.registryName ?? currentComposer.type;
     return currentComposer.elements.composer({
-      actions: widgetActions[currentComposer.type],
+      actions: widgetActions[key],
       authorId: selectedAuthorId,
       onClose,
     });
@@ -55,7 +69,7 @@ export function WidgetWorkbench({
         throw new Error(text || "Failed to delete widget");
       }
       setRemoveNotice(`Removed ${target}. Reload to see changes.`);
-      if (mode === type) setMode("message");
+      if (mode === (registryName || type)) setMode(defaultKey);
     } catch (err) {
       console.error(err);
       setRemoveNotice("Could not remove widget. Ensure dev server is running.");
@@ -77,7 +91,7 @@ export function WidgetWorkbench({
           aria-label="Close workbench"
           onClick={onClose}
         >
-          X
+          Close
         </button>
         <div className="workbench-header">
           <h3 id="workbench-modal-title">Message Workbench</h3>
@@ -85,23 +99,34 @@ export function WidgetWorkbench({
             <button
               type="button"
               className={`pill-toggle ${
-                mode === "addWidget" ? "pill-toggle--active" : ""
+                mode === ADD_WIDGET_KEY ? "pill-toggle--active" : ""
               }`}
-              onClick={() => setMode("addWidget")}
+              onClick={() => setMode(ADD_WIDGET_KEY)}
             >
-              +
+              ➕
+            </button>
+            <button
+              type="button"
+              className={`pill-toggle ${
+                mode === DEMO_TAB_KEY ? "pill-toggle--active" : ""
+              }`}
+              onClick={() => setMode(DEMO_TAB_KEY)}
+            >
+              🔎
             </button>
             {composerWidgets.map((w) => (
               <div
                 className={`pill-toggle pill-toggle-group ${
-                  mode === w.type ? "pill-toggle--active" : ""
+                  mode === (w.registryName ?? w.type)
+                    ? "pill-toggle--active"
+                    : ""
                 }`}
                 key={w.registryName || w.type}
               >
                 <button
                   type="button"
                   className="pill-group__label"
-                  onClick={() => setMode(w.type)}
+                  onClick={() => setMode(w.registryName ?? w.type)}
                   aria-label={`Open ${w.registryName as string} composer`}
                 >
                   {w.registryName}
@@ -117,7 +142,6 @@ export function WidgetWorkbench({
               </div>
             ))}
           </div>
-          {removeNotice && <p className="workbench-helper">{removeNotice}</p>}
         </div>
 
         {renderComposer()}

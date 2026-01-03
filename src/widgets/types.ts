@@ -42,5 +42,6 @@ export interface ChatWidgetDefinition<TActions = unknown> {
   registryName?: string;
 }
 
-export type WidgetActionMap = Partial<Record<MessageType, unknown>>;
+export type WidgetKey = string;
+export type WidgetActionMap = Record<WidgetKey, unknown>;
 export type AnyWidgetDefinition = ChatWidgetDefinition<any>;

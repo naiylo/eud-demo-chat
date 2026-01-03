@@ -33,7 +33,7 @@ type PollActions = {
   createPoll: (
     poll: Pick<PollCustom, "prompt" | "options">,
     authorId: string
-  ) => Promise<string>;
+  ) => Promise<string | undefined>;
   addVote: (
     pollId: string,
     optionId: string,
@@ -71,7 +71,10 @@ function createActions({
   ) => {
     const alreadyVoted = getMessagesSnapshot().some(
       (m) =>
-        m.type === "vote" && isVoteCustom(m.custom) && m.authorId === authorId
+        m.type === "vote" &&
+        isVoteCustom(m.custom) &&
+        m.custom.pollId === pollId &&
+        m.authorId === authorId
     );
     if (alreadyVoted) return;
 
@@ -92,7 +95,6 @@ function createActions({
       (m) =>
         m.type === "vote" &&
         isVoteCustom(m.custom) &&
-        m.custom.pollId === pollId &&
         m.authorId === authorId
     );
     if (!votesToDelete.length) return;
@@ -103,7 +105,6 @@ function createActions({
           !(
             m.type === "vote" &&
             isVoteCustom(m.custom) &&
-            m.custom.pollId === pollId &&
             m.authorId === authorId
           )
       )
@@ -422,9 +423,9 @@ if (
   document.head.appendChild(style);
 }
 
-export const examplepoll2: ChatWidgetDefinition<PollActions> = {
+export const PollBrokenDeleteVoteFunction: ChatWidgetDefinition<PollActions> = {
   type: "createPoll",
-  registryName: "examplepoll2",
+  registryName: "PollBrokenDeleteVoteFunction",
   elements: {
     render: (props) => <PollView {...props} />,
     composer: (props) => <PollComposer {...props} />,

@@ -25,13 +25,14 @@ export function MessageBubble({
   const widget = widgets.find((w) => w.type === message.type);
   const renderer =
     widget?.elements.render ?? (widget as any)?.render ?? null;
+  const widgetKey = widget?.registryName ?? widget?.type ?? message.type;
   const renderContent = renderer ? (
     renderer({
       message,
       personas,
       allMessages,
       currentActorId,
-      actions: widgetActions[widget?.type ?? message.type],
+      actions: widgetActions[widgetKey],
     })
   ) : (
     <p>{message.text}</p>

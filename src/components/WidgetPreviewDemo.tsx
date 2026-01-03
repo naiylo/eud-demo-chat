@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Message, Persona } from "../db/sqlite";
 import type { ChatWidgetDefinition } from "../widgets/types";
 import { generatePollActions, type Action} from "../generator/fuzzer";
-import { type ConstraintInput, type PollActionInput } from "../exampleWidgets/examplepoll";
 
 const PREVIEW_PERSONAS: Persona[] = [
   { id: "designer", name: "Oskar", color: "#e86a92", bio: "" },
@@ -50,7 +49,8 @@ class DemoDatabaseObserver {
     }) => void
   ) {}
 
-  wrap<T extends Action[]>(actions: T): T {
+  wrap<T extends Action[]>(actions: T): T{
+    console.log(actions);
     const wrapped: Record<string, any> = {};
     actions.forEach((action) => {
       if (typeof value !== "function") {
@@ -87,10 +87,7 @@ export type DemoScriptContext = {
 const DEMO_SCRIPTS: Record<string, (ctx: DemoScriptContext) => Promise<void>> =
   {
     createPoll: async ({ actions, wait, getMessages }) => {
-      const pollActions = actions as { [key: string]: Action<
-        PollActionInput,
-        ConstraintInput
-      >};
+      const pollActions = actions as { [key: string]: Action};
       const addVoteAction =  pollActions["addVote"];
       const deleteVoteAction = pollActions["deleteVote"];
       const createPollAction = pollActions["createPoll"];

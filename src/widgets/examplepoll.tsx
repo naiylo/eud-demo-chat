@@ -6,114 +6,141 @@ import type {
   WidgetComposerProps,
   WidgetRenderProps,
 } from "../widgets/types";
+import type { Action } from "../generics/actions";
+import type { ObjectInstance } from "../generics/objects";
 
 type PollOption = { id: string; label: string };
 
-export interface PollCustom {
-  prompt: string;
-  options: PollOption[];
-}
+// export interface PollCustom {
+//   prompt: string;
+//   options: PollOption[];
+// }
 
-export interface VoteCustom {
-  pollId: string;
-  optionId: string;
-}
+// export interface VoteCustom {
+//   pollId: string;
+//   optionId: string;
+// }
 
-const isPollCustom = (custom: unknown): custom is PollCustom =>
-  !!custom &&
-  typeof (custom as PollCustom).prompt === "string" &&
-  Array.isArray((custom as PollCustom).options);
+// const isPollCustom = (custom: unknown): custom is PollCustom =>
+//   !!custom &&
+//   typeof (custom as PollCustom).prompt === "string" &&
+//   Array.isArray((custom as PollCustom).options);
 
-const isVoteCustom = (custom: unknown): custom is VoteCustom =>
-  !!custom &&
-  typeof (custom as VoteCustom).pollId === "string" &&
-  typeof (custom as VoteCustom).optionId === "string";
+// const isVoteCustom = (custom: unknown): custom is VoteCustom =>
+//   !!custom &&
+//   typeof (custom as VoteCustom).pollId === "string" &&
+//   typeof (custom as VoteCustom).optionId === "string";
 
-type PollActions = {
-  createPoll: (
-    poll: Pick<PollCustom, "prompt" | "options">,
-    authorId: string
-  ) => Promise<void>;
-  addVote: (
-    pollId: string,
-    optionId: string,
-    authorId: string
-  ) => Promise<void>;
-  deleteVote: (pollId: string, authorId: string) => Promise<void>;
-};
+// type PollActions = {
+//   createPoll: (
+//     poll: Pick<PollCustom, "prompt" | "options">,
+//     authorId: string
+//   ) => Promise<void>;
+//   addVote: (
+//     pollId: string,
+//     optionId: string,
+//     authorId: string
+//   ) => Promise<void>;
+//   deleteVote: (pollId: string, authorId: string) => Promise<void>;
+// };
 
 function createActions({
   addMessage,
   deleteMessage,
   setMessages,
   getMessagesSnapshot,
-}: WidgetActionDeps): PollActions {
-  const createPoll: PollActions["createPoll"] = async (poll, authorId) => {
-    if (!poll.prompt.trim() || poll.options.length < 2) return;
-    const msg: Message = {
-      id: `poll-${Date.now()}`,
-      authorId,
-      text: poll.prompt.trim(),
-      timestamp: new Date().toISOString(),
-      type: "createPoll",
-      custom: poll,
+}: WidgetActionDeps): Action[] {
+  const createPoll: Action = {
+      name: "createPoll",
+      description: "Create a new poll with options",
+      preConditions: [],
+      postConditions: [],
+      execute: async (input: Record<string, ObjectInstance[]>) => {
+        if (!input.poll || !input.author) 
+          return;
+
+        const poll = input.poll[0];
+        const author = input.author[0];
+
+        if (poll.properties["prompt"] && Array.isArray(poll.properties["options"])) {
+          const prompt = poll.properties["prompt"] as string;
+          const options = poll.properties["options"] as PollOption[];
+          if (!prompt.trim() || options.length < 2) 
+            return;
+          const msg: Message = {
+            id: poll.id,
+            authorId: author.id,
+            text: prompt.trim(),
+            timestamp: new Date().toISOString(),
+            type: "createPoll",
+            custom: input.poll,
+          };
+          await addMessage(msg);
+          setMessages((cur) => [...cur, msg]);
+        }
+      }
     };
-    await addMessage(msg);
-    setMessages((cur) => [...cur, msg]);
-  };
-
-  const addVote: PollActions["addVote"] = async (
-    pollId,
-    optionId,
-    authorId
-  ) => {
-    const alreadyVoted = getMessagesSnapshot().some(
-      (m) =>
-        m.type === "vote" &&
-        isVoteCustom(m.custom) &&
-        m.custom.pollId === pollId &&
-        m.authorId === authorId
-    );
-    if (alreadyVoted) return;
-
-    const vote: Message = {
-      id: `vote-${Date.now()}`,
-      authorId,
-      text: "",
-      timestamp: new Date().toISOString(),
-      type: "vote",
-      custom: { pollId, optionId } satisfies VoteCustom,
-    };
-    setMessages((cur) => [...cur, vote]);
-    await addMessage(vote);
-  };
-
-  const deleteVote: PollActions["deleteVote"] = async (pollId, authorId) => {
-    const votesToDelete = getMessagesSnapshot().filter(
-      (m) =>
-        m.type === "vote" &&
-        isVoteCustom(m.custom) &&
-        m.custom.pollId === pollId &&
-        m.authorId === authorId
-    );
-    if (!votesToDelete.length) return;
-
-    setMessages((cur) =>
-      cur.filter(
+  
+    const addVote: Action = {
+      name: "addVote",
+      description: "Add a vote to a poll",
+      preConditions: [],
+      postConditions: [],
+      execute: async (input: AddVoteActionInput) => {
+        const alreadyVoted = getMessagesSnapshot().some(
         (m) =>
-          !(
+          m.type === "vote" &&
+          isVoteCustom(m.custom) &&
+          m.custom.pollId === input.pollId &&
+          m.authorId === input.authorId
+        );
+        if (alreadyVoted) return;
+  
+        const vote: Message = {
+          id: `vote-${Date.now()}`,
+          authorId: input.authorId,
+          text: "",
+          timestamp: new Date().toISOString(),
+          type: "vote",
+          custom: { pollId: input.pollId, optionId: input.optionId } satisfies VoteCustom,
+        };
+        setMessages((cur) => [...cur, vote]);
+        await addMessage(vote);
+      }
+    };
+  
+    const deleteVote: Action = {
+      name: "deleteVote",
+      description: "Delete a vote from a poll",
+      preConditions: [],
+      postConditions: [],
+      execute: async (input: DeleteVoteActionInput) => {
+        const votesToDelete = getMessagesSnapshot().filter(
+          (m) =>
             m.type === "vote" &&
             isVoteCustom(m.custom) &&
-            m.custom.pollId === pollId &&
-            m.authorId === authorId
+            m.custom.pollId === input.pollId &&
+          m.authorId === input.authorId
+        );
+        if (!votesToDelete.length) return;
+  
+        setMessages((cur) =>
+          cur.filter(
+            (m) =>
+              !(
+                m.type === "vote" &&
+                isVoteCustom(m.custom) &&
+                m.custom.pollId === input.pollId &&
+                m.authorId === input.authorId
+              )
           )
-      )
-    );
-
-    for (const vote of votesToDelete) {
-      await deleteMessage(vote.id);
-    }
-  };
+        );
+  
+        for (const vote of votesToDelete) {
+          await deleteMessage(vote.id);
+        }
+      }
+    };
 
   return { createPoll, addVote, deleteVote };
 }

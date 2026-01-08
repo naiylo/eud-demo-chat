@@ -1,33 +1,4 @@
-import type { DemoScriptContext } from "../components/WidgetPreviewDemo";
-import { isAddVoteActionInput, isCreatePollActionInput } from "../exampleWidgets/examplepoll";
-
-export type ConditionInput = {
-    previousAction: LogEntry[];
-    nextActions: LogEntry[];
-    data: Record<string, unknown>;
-}
-
-type LogEntry = {
-    action: string;
-    input: Record<string, unknown>;
-}
-
-export function isPreConditionInput(input: ConditionInput): input is ConditionInput {
-    return (input as ConditionInput).previousAction !== undefined;
-}
-export interface Constraint {
-    name: string;
-    description: string;
-    validate: (input: ConditionInput) => boolean;
-}
-
-export interface Action {
-    name: string;
-    description: string;
-    execute(input: Record<string, unknown>): Promise<void>;
-    preConditions: Constraint[];
-    postConditions: Constraint[];
-}
+import type { DemoScriptContext } from "../widgets/demoDiagnostics";
 
 type Poll = {
     id: string;
@@ -37,28 +8,23 @@ type Poll = {
 const polls: Poll[] = [];
 
 async function createPoll(actions: Action[], creatorId: string): Promise<LogEntry | undefined> {
-    const action = actions.find(a => a.name === "createPoll");
-    if (isCreatePollActionInput(action)) {
-        const options = [];
-        const optionCount = 2 + Math.floor(Math.random() * 4);
-        for (let i = 0; i < optionCount; i++) {
-            options.push({ id: `opt-${i + 1}`, label: `Option ${i + 1}` });
-        }
-        const id = `poll-${polls.length + 1}`;
-        polls.push({ id, options });
-        return { action: "createPoll", input: { authorId: creatorId, poll: { prompt: "Sample?", options }, id }};
+    const options = [];
+    const optionCount = 2 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < optionCount; i++) {
+        options.push({ id: `opt-${i + 1}`, label: `Option ${i + 1}` });
     }
+    const id = `poll-${polls.length + 1}`;
+    polls.push({ id, options });
+    return { action: "createPoll", input: { authorId: creatorId, poll: { prompt: "Sample?", options }, id }};
+
 }
 
 async function createVote(actions: Action[], authorId: string, pollId?: string, optionIndex?: number): Promise<LogEntry | undefined> {
-    const action = actions.find(a => a.name === "addVote");
-    if (isAddVoteActionInput(action)) {
-        const votePoll = pollId ? polls.find(p => p.id === pollId) : polls[Math.floor(Math.random() * polls.length)];
-        if (!votePoll)
-            return;
-        const voteOptionIndex = optionIndex ?? Math.floor(Math.random() * votePoll.options.length);
-        return { action: "addVote", input: { authorId, pollId: votePoll.id, optionId: votePoll.options[voteOptionIndex].id }};
-    }
+    const votePoll = pollId ? polls.find(p => p.id === pollId) : polls[Math.floor(Math.random() * polls.length)];
+    if (!votePoll)
+        return;
+    const voteOptionIndex = optionIndex ?? Math.floor(Math.random() * votePoll.options.length);
+    return { action: "addVote", input: { authorId, pollId: votePoll.id, optionId: votePoll.options[voteOptionIndex].id }};
 }
 
 async function randomLog(personas: string[], actions: Action[], maxLen: number): Promise<LogEntry[]> {

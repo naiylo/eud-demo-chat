@@ -89,10 +89,10 @@ export const isDeleteVoteActionInput = (input: unknown): input is DeleteVoteActi
     );
 }
 
-class CreatePollPreCondition implements Constraint<PollActionInput, ConstraintInput> {
+class CreatePollPreCondition implements Constraint {
     name = "CreatePollPreCondition";
     description = "No precondition for creating a poll";
-    validate(input: ConditionInput<PollActionInput, ConstraintInput>): boolean {
+    validate(input: ConditionInput): boolean {
         return true;
     }
 }
@@ -104,8 +104,8 @@ function createActions({
   deleteMessage,
   setMessages,
   getMessagesSnapshot,
-}: WidgetActionDeps): Action<PollActionInput, ConstraintInput>[] {
-  const createPoll: Action<PollActionInput, ConstraintInput> = {
+}: WidgetActionDeps): Action[] {
+  const createPoll: Action = {
     name: "createPoll",
     description: "Create a new poll with options",
     preConditions: [
@@ -127,7 +127,7 @@ function createActions({
     }
   };
 
-  const addVote: Action<PollActionInput, ConstraintInput> = {
+  const addVote: Action = {
     name: "addVote",
     description: "Add a vote to a poll",
     preConditions: [],
@@ -155,7 +155,7 @@ function createActions({
     }
   };
 
-  const deleteVote: Action<PollActionInput, ConstraintInput> = {
+  const deleteVote: Action = {
     name: "deleteVote",
     description: "Delete a vote from a poll",
     preConditions: [],
@@ -195,7 +195,7 @@ function PollComposer({
   actions,
   authorId,
   onClose,
-}: WidgetComposerProps<Action<PollActionInput, ConstraintInput>[]>) {
+}: WidgetComposerProps<Action[]>) {
   const [prompt, setPrompt] = useState("");
   const [options, setOptions] = useState<PollOption[]>([
     { id: "opt-0", label: "" },
@@ -269,7 +269,7 @@ function PollView({
   personas,
   currentActorId,
   actions,
-}: WidgetRenderProps<Action<PollActionInput, ConstraintInput>[]>) {
+}: WidgetRenderProps<Action[]>) {
   if (!isPollCustom(message.custom)) {
     return <p>Poll is missing configuration.</p>;
   }
@@ -499,7 +499,7 @@ if (
   document.head.appendChild(style);
 }
 
-export const examplepoll: ChatWidgetDefinition<Action<PollActionInput, ConstraintInput>[]> = {
+export const examplepoll: ChatWidgetDefinition<Action[]> = {
   type: "createPoll",
   registryName: "examplepoll",
   elements: {

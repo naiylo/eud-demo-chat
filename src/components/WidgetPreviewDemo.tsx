@@ -36,6 +36,8 @@ const describeImpact = (action: DemoActionImpact) => {
   return parts.length ? parts.join(" | ") : "no database impact recorded";
 };
 
+
+
 export function WidgetPreviewDemo({
   widget,
   onClose,

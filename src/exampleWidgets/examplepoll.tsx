@@ -6,56 +6,97 @@ import type {
   WidgetComposerProps,
   WidgetRenderProps,
 } from "../widgets/types";
-import type { Action, ConditionInput, Constraint } from "../generator/fuzzer";
+import type { Action } from "../generics/actions";
+import { isOfSchema, newObjectInstance, type ObjectInstance, type ObjectSchema } from "../generics/objects";
 
 type PollOption = { id: string; label: string };
 
-export interface PollCustom {
-  prompt: string;
-  options: PollOption[];
-}
+// export interface PollCustom {
+//   prompt: string;
+//   options: PollOption[];
+// }
 
-export interface VoteCustom {
-  pollId: string;
-  optionId: string;
-}
+// export interface VoteCustom {
+//   pollId: string;
+//   optionId: string;
+// }
 
-const isPollCustom = (custom: unknown): custom is PollCustom =>
-  !!custom &&
-  typeof (custom as PollCustom).prompt === "string" &&
-  Array.isArray((custom as PollCustom).options);
+// const isPollCustom = (custom: unknown): custom is PollCustom =>
+//   !!custom &&
+//   typeof (custom as PollCustom).prompt === "string" &&
+//   Array.isArray((custom as PollCustom).options);
 
-const isVoteCustom = (custom: unknown): custom is VoteCustom =>
-  !!custom &&
-  typeof (custom as VoteCustom).pollId === "string" &&
-  typeof (custom as VoteCustom).optionId === "string";
+// const isVoteCustom = (custom: unknown): custom is VoteCustom =>
+//   !!custom &&
+//   typeof (custom as VoteCustom).pollId === "string" &&
+//   typeof (custom as VoteCustom).optionId === "string";
 
-export type CreatePollActionInput = {
-    poll: Pick<PollCustom, "prompt" | "options">;
-    id: string;
-    authorId: string;
-}
+// type PollActions = {
+//   createPoll: (
+//     poll: Pick<PollCustom, "prompt" | "options">,
+//     authorId: string
+//   ) => Promise<void>;
+//   addVote: (
+//     pollId: string,
+//     optionId: string,
+//     authorId: string
+//   ) => Promise<void>;
+//   deleteVote: (pollId: string, authorId: string) => Promise<void>;
+// };
 
-export type AddVoteActionInput = {
-    pollId: string;
-    optionId: string;
-    authorId: string;
-}
-
-export type DeleteVoteActionInput = {
-  pollId: string;
-  authorId: string;
-}
-
-class CreatePollPreCondition implements Constraint {
-    name = "CreatePollPreCondition";
-    description = "No precondition for creating a poll";
-    validate(input: ConditionInput): boolean {
-        return true;
+const pollSchema: ObjectSchema = {
+  name: "poll",
+  properties: [
+    { name: "prompt", type: "string", array: false },
+    { 
+      name: "options", 
+      type: "object", 
+      array: true, 
+      schema: {
+        id: { name: "id", type: "string", array: false },
+        label: { name: "label", type: "string", array: false },
+      } 
+    },
+  ],
+  relationships: [
+    {
+      cardinality: "N:1",
+      propertyName: "authorId",
+      targetSchema: "author",
+      optional: false,
     }
-}
+  ],
+};
 
-export type PollActionInput = CreatePollActionInput | AddVoteActionInput | DeleteVoteActionInput;
+const voteSchema: ObjectSchema = {
+  name: "vote",
+  properties: [
+    { name: "optionId", type: "string", array: false },
+  ],
+  relationships: [
+    {
+      cardinality: "N:1",
+      propertyName: "pollId",
+      targetSchema: "poll",
+      optional: false,
+    },
+    {
+      cardinality: "N:1",
+      propertyName: "authorId",
+      targetSchema: "author",
+      optional: false,
+    }
+  ],
+};
+
+const authorSchema: ObjectSchema = {
+  name: "author",
+  properties: [
+    { name: "name", type: "persona", array: false },
+  ],
+  relationships: [],
+};
+
 
 function createActions({
   addMessage,
@@ -64,94 +105,118 @@ function createActions({
   getMessagesSnapshot,
 }: WidgetActionDeps): Action[] {
   const createPoll: Action = {
-    name: "createPoll",
-    description: "Create a new poll with options",
-    preConditions: [
-      new CreatePollPreCondition()
-    ],
-    postConditions: [],
-    execute: async (input: CreatePollActionInput) => {
-      if (!input.poll.prompt.trim() || input.poll.options.length < 2) return;
-      const msg: Message = {
-        id: input.id,
-        authorId: input.authorId,
-        text: input.poll.prompt.trim(),
-        timestamp: new Date().toISOString(),
-        type: "createPoll",
-        custom: input.poll,
-      };
-      await addMessage(msg);
-      setMessages((cur) => [...cur, msg]);
-    }
-  };
+      name: "createPoll",
+      description: "Create a new poll with options",
+      preConditions: [],
+      postConditions: [],
+      inputSchemas: {
+        poll: pollSchema,
+        author: authorSchema
+      },
+      execute: async (input: Record<string, ObjectInstance[]>) => {
+        if (!input.poll || !input.author) 
+          return;
 
-  const addVote: Action = {
-    name: "addVote",
-    description: "Add a vote to a poll",
-    preConditions: [],
-    postConditions: [],
-    execute: async (input: AddVoteActionInput) => {
-      const alreadyVoted = getMessagesSnapshot().some(
-      (m) =>
-        m.type === "vote" &&
-        isVoteCustom(m.custom) &&
-        m.custom.pollId === input.pollId &&
-        m.authorId === input.authorId
-      );
-      if (alreadyVoted) return;
+        const poll = input.poll[0];
+        const author = input.author[0];
 
-      const vote: Message = {
-        id: `vote-${Date.now()}`,
-        authorId: input.authorId,
-        text: "",
-        timestamp: new Date().toISOString(),
-        type: "vote",
-        custom: { pollId: input.pollId, optionId: input.optionId } satisfies VoteCustom,
-      };
-      setMessages((cur) => [...cur, vote]);
-      await addMessage(vote);
-    }
-  };
-
-  const deleteVote: Action = {
-    name: "deleteVote",
-    description: "Delete a vote from a poll",
-    preConditions: [],
-    postConditions: [],
-    execute: async (input: DeleteVoteActionInput) => {
-      const votesToDelete = getMessagesSnapshot().filter(
+        if (poll.properties["prompt"] && Array.isArray(poll.properties["options"])) {
+          const prompt = poll.properties["prompt"] as string;
+          const options = poll.properties["options"] as PollOption[];
+          if (!prompt.trim() || options.length < 2) 
+            return;
+          const msg: Message = {
+            id: poll.id,
+            authorId: author.id,
+            text: prompt.trim(),
+            timestamp: new Date().toISOString(),
+            type: "createPoll",
+            custom: poll,
+          };
+          await addMessage(msg);
+          setMessages((cur) => [...cur, msg]);
+        }
+      }
+    };
+  
+    const addVote: Action = {
+      name: "addVote",
+      description: "Add a vote to a poll",
+      preConditions: [],
+      postConditions: [],
+      inputSchemas: {
+        vote: voteSchema,
+      },
+      execute: async (input: Record<string, ObjectInstance[]>) => {
+        const vote = input["vote"]?.[0];
+        const alreadyVoted = getMessagesSnapshot().some(
         (m) =>
           m.type === "vote" &&
-          isVoteCustom(m.custom) &&
-          m.custom.pollId === input.pollId &&
-        m.authorId === input.authorId
-      );
-      if (!votesToDelete.length) return;
-
-      setMessages((cur) =>
-        cur.filter(
-          (m) =>
-            !(
-              m.type === "vote" &&
-              isVoteCustom(m.custom) &&
-              m.custom.pollId === input.pollId &&
-              m.authorId === input.authorId
-            )
-        )
-      );
-
-      for (const vote of votesToDelete) {
-        await deleteMessage(vote.id);
+          m.custom &&
+          isOfSchema(m.custom, "vote") &&
+          m.custom.references["pollId"] === vote.references["pollId"] &&
+          m.authorId === vote.references["authorId"]
+        );
+        if (alreadyVoted) return;
+  
+        const voteMsg: Message = {
+          id: `vote-${Date.now()}`,
+          authorId: vote.references["authorId"] as string,
+          text: "",
+          timestamp: new Date().toISOString(),
+          type: "vote",
+          custom: vote,
+        };
+        setMessages((cur) => [...cur, voteMsg]);
+        await addMessage(voteMsg);
       }
-    }
-  };
+    };
+  
+    const deleteVote: Action = {
+      name: "deleteVote",
+      description: "Delete a vote from a poll",
+      preConditions: [],
+      postConditions: [],
+      inputSchemas: {
+        vote: voteSchema,
+      },
+      execute: async (input: Record<string, ObjectInstance[]>) => {
+        const vote = input["vote"]?.[0];
+        const votesToDelete = getMessagesSnapshot().filter(
+          (m) =>
+            m.type === "vote" &&
+            m.custom &&
+            isOfSchema(m.custom, "vote") &&
+            m.custom.references["pollId"] === vote.references["pollId"] &&
+            m.authorId === vote.references["authorId"]
+        );
+        if (!votesToDelete.length) return;
+  
+        setMessages((cur) =>
+          cur.filter(
+            (m) =>
+              !(
+                m.type === "vote" &&
+                m.custom &&
+                isOfSchema(m.custom, "vote") &&
+                m.custom.references["pollId"] === vote.references["pollId"] &&
+                m.authorId === vote.references["authorId"]
+              )
+          )
+        );
+  
+        for (const vote of votesToDelete) {
+          await deleteMessage(vote.id);
+        }
+      }
+    };
 
   return [createPoll, addVote, deleteVote];
 }
 
 function PollComposer({
   actions,
-  authorId,
+  author,
   onClose,
 }: WidgetComposerProps<Action[]>) {
   const [prompt, setPrompt] = useState("");
@@ -176,11 +241,13 @@ function PollComposer({
     const trimmedOptions = options
       .map((opt) => ({ ...opt, label: opt.label.trim() }))
       .filter((opt) => opt.label);
+
     if (!prompt.trim() || trimmedOptions.length < 2) return;
-    const action = actions.find((a) => a.name === "createPoll");
-    await action?.execute({
-      poll: { prompt: prompt.trim(), options: trimmedOptions },
-      authorId, id: `poll-${Date.now()}`
+    const poll = actions.find((a) => a.name === "createPoll");
+    if (!poll) return;
+    await poll.execute({ 
+      poll: [newObjectInstance(pollSchema, `poll-${Date.now()}`, { prompt: prompt.trim(), options: trimmedOptions })],
+      author: [newObjectInstance(authorSchema, author.id, { name: author.name })]
     });
     setPrompt("");
     setOptions([
@@ -228,7 +295,8 @@ function PollView({
   currentActorId,
   actions,
 }: WidgetRenderProps<Action[]>) {
-  if (!isPollCustom(message.custom)) {
+  console.log("Rendering PollView with message:", message);
+  if (!message.custom || !isOfSchema(message.custom, "poll")) {
     return <p>Poll is missing configuration.</p>;
   }
 
@@ -241,46 +309,64 @@ function PollView({
     [personas]
   );
 
-  const options = message.custom.options;
+  const poll = message.custom as ObjectInstance;
+
+  const options = poll.properties["options"] as PollOption[];
   const votes = allMessages.filter(
-    (m): m is Message & { custom: VoteCustom } =>
+    (m): m is Message & { custom: ObjectInstance } =>
       m.type === "vote" &&
-      isVoteCustom(m.custom) &&
-      m.custom.pollId === message.id
+      isOfSchema(m.custom, "vote") &&
+      m.custom?.references["pollId"] === message.id
   );
   const totalVotes = votes.length;
   const myVote = votes.find((v) => v.authorId === currentActorId);
-  const addVoteAction = actions.find((a) => a.name === "addVote");
-  const deleteVoteAction = actions.find((a) => a.name === "deleteVote");
 
   const handleVote = async (optionId: string) => {
+    const addVoteAction = actions.find((a) => a.name === "addVote");
+    const deleteVoteAction = actions.find((a) => a.name === "deleteVote");
     if (!addVoteAction || !deleteVoteAction) return;
     if (!myVote) {
-      await addVoteAction.execute({ pollId: message.id, optionId, authorId: currentActorId });
+      await addVoteAction.execute({
+        vote: [newObjectInstance(voteSchema, `vote-${Date.now()}`, {
+          optionId,
+          pollId: message.id,
+          authorId: currentActorId,
+        })],
+      });
       return;
     }
-    if (myVote.custom.optionId === optionId) {
-      await deleteVoteAction.execute({ pollId: message.id, authorId: currentActorId });
+    if (myVote.custom.properties["optionId"] === optionId) {
+      await deleteVoteAction.execute({
+        vote: [myVote.custom],
+      } );
       return;
     }
-    await deleteVoteAction.execute({ pollId: message.id, authorId: currentActorId });
-    await addVoteAction.execute({ pollId: message.id, optionId, authorId: currentActorId });
+    await deleteVoteAction.execute({
+      vote: [myVote.custom],
+    });
+    await addVoteAction.execute({
+      vote: [newObjectInstance(voteSchema, `vote-${Date.now()}`, {
+        optionId,
+        pollId: message.id,
+        authorId: currentActorId,
+      })],
+    });
   };
 
   return (
     <div className="poll-card">
       <div className="poll-header">
-        <p className="poll-question">{message.custom.prompt}</p>
+        <p className="poll-question">{message.custom.properties["prompt"] as string}</p>
       </div>
       <div className="poll-options">
         {options.map((option) => {
           const optionVotes = votes.filter(
-            (v) => v.custom.optionId === option.id
+            (v) => v.custom.properties["optionId"] === option.id
           );
           const percent = totalVotes
             ? Math.round((optionVotes.length / totalVotes) * 100)
             : 0;
-          const checked = myVote?.custom.optionId === option.id;
+          const checked = myVote?.custom.properties["optionId"] === option.id;
           return (
             <button
               key={option.id}
@@ -457,9 +543,9 @@ if (
   document.head.appendChild(style);
 }
 
-export const fuzzedPoll: ChatWidgetDefinition<Action[]> = {
+export const examplepoll: ChatWidgetDefinition<Action[]> = {
   type: "createPoll",
-  registryName: "fuzzedpoll",
+  registryName: "examplepoll",
   elements: {
     render: (props) => <PollView {...props} />,
     composer: (props) => <PollComposer {...props} />,
@@ -473,13 +559,13 @@ const getVotesForAuthor = (
   messages: Message[],
   pollId: string,
   authorId: string
-): Array<Message & { custom: VoteCustom }> =>
+): Array<Message & { custom: ObjectInstance }> =>
   messages.filter(
-    (m): m is Message & { custom: VoteCustom } =>
+    (m): m is Message & { custom: ObjectInstance } =>
       m.type === "vote" &&
-      isVoteCustom(m.custom) &&
-      m.custom.pollId === pollId &&
-      m.authorId === authorId
+        isOfSchema(m.custom, "vote") &&
+        m.custom?.references["pollId"] === pollId &&
+        m.custom?.references["authorId"] === authorId
   );
 
 // Check if there is a vote on the poll already

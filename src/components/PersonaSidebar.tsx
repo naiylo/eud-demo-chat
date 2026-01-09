@@ -61,7 +61,7 @@ export function PersonaSidebar({
         onClose={() => setShowWorkbench(false)}
         widgets={widgets}
         widgetActions={widgetActions}
-        selectedAuthorId={selectedId}
+        selectedAuthor={personas.find((p) => p.id === selectedId)!}
       />
     </>
   );

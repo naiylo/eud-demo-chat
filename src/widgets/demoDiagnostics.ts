@@ -1,4 +1,5 @@
 import type { Message, Persona } from "../db/sqlite";
+import type { ObjectSchema } from "../generics/objects";
 
 export const PREVIEW_PERSONAS: Persona[] = [
   { id: "designer", name: "Oskar", color: "#e86a92", bio: "" },
@@ -37,6 +38,7 @@ export type HeuristicFinding = {
 
 export type DemoScriptContext = {
   actions: unknown;
+  schemas: ObjectSchema[],
   wait: (ms: number) => Promise<void>;
   getMessages: () => Message[];
 };

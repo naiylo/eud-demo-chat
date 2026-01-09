@@ -18,7 +18,7 @@ export type WidgetRenderProps<TActions> = {
 
 export type WidgetComposerProps<TActions> = {
   actions: TActions;
-  authorId: string;
+  author: Persona;
   onClose: () => void;
 };
 

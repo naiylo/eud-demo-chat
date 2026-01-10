@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction, ReactNode } from "react";
 import type { Message, MessageType, Persona } from "../db/sqlite";
+import type { ObjectSchema } from "../generics/objects";
 
 export type WidgetActionDeps = {
   addMessage: (msg: Message) => Promise<void>;
@@ -36,6 +37,7 @@ export type WidgetElements<TActions> = {
 export interface ChatWidgetDefinition<TActions = unknown> {
   type: MessageType;
   elements: WidgetElements<TActions>;
+  schemas: ObjectSchema[];
   createActions: (deps: WidgetActionDeps) => TActions;
   hideMessage?: (message: Message) => boolean;
   /** Optional: name used in registry/file management */

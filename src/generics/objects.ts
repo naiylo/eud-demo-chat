@@ -6,6 +6,8 @@ export type PropertyDefinition = {
   required?: boolean;
   minValue?: number;
   maxValue?: number;
+  minLength?: number;
+  maxLength?: number;
   defaultValue?: unknown;
 };
 
@@ -102,7 +104,7 @@ export function randomObjectInstance(schema: ObjectSchema, id: string, reference
   const properties: Record<string, unknown> = {};
   for (const propDef of schema.properties) {
     if (propDef.array) {
-      const arrLen = Math.floor(rng() * 5) + 1;
+      const arrLen = Math.floor(rng() * ((propDef.maxLength ?? 10) - (propDef.minLength ?? 0) + 1) + (propDef.minLength ?? 0));
       properties[propDef.name] = Array.from({ length: arrLen }, () => randomProperty(propDef, personas, rng));
     } else {
       properties[propDef.name] = randomProperty(propDef, personas, rng);

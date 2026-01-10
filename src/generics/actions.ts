@@ -10,10 +10,17 @@ export interface Constraint {
     validate: (previousAction: ActionLogEntry[], nextActions: ActionLogEntry[], data: Record<string, ObjectInstance[]>) => boolean;
 }
 
+export type InputDefinition = {
+    name: string;
+    schema: ObjectSchema;
+    minCount?: number;
+    maxCount?: number;
+}
+
 export interface Action {
     name: string;
     description: string;
-    inputSchemas: Record<string, ObjectSchema>;
+    inputDefinition: InputDefinition[];
     execute(input: Record<string, ObjectInstance[]>): Promise<void>;
     preConditions: Constraint[];
     postConditions: Constraint[];

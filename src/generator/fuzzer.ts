@@ -33,6 +33,8 @@ async function createNextObjectInstance(
         }
     }
 
+    
+
     const instance = randomObjectInstance(
         schema,
         rng().toString(36).substring(0, REFERENCE_ID_LENGTH),
@@ -40,6 +42,8 @@ async function createNextObjectInstance(
         personas,
         rng
     );
+
+    console.log("Creating instance ", instance);
 
     if (!objects[schema.name]) {
         objects[schema.name] = [];
@@ -80,12 +84,25 @@ async function generateAction(
     rng: () => number
 ): Promise<ActionLogEntry> {
     const input: Record<string, ObjectInstance[]> = {};
-    for (const [paramName, schema] of Object.entries(action.inputSchemas)) {
-        const objInstance = await createNextObjectInstance([schema], personas, rng);
-        if (typeof objInstance === "string") {
-            await generateDependencies(objInstance, schemas, personas, rng);
+    for (const def of action.inputDefinition) {
+        if (!objects[def.schema.name] || objects[def.schema.name].length === 0)  {
+            const amount = Math.floor(rng() * ((def.maxCount ?? 1) - (def.minCount ?? 1) + 1) + (def.minCount ?? 1));
+            for (let i = 0; i < amount; i++) {
+                let objInstance = await createNextObjectInstance([def.schema], personas, rng);
+                if (typeof objInstance === "string") {
+                    await generateDependencies(objInstance, schemas, personas, rng);
+                    objInstance = await createNextObjectInstance([def.schema], personas, rng);
+                }
+            }
+        } else {
+            const existingCount = objects[def.schema.name].length;
+            const amount = Math.floor(rng() * ((def.maxCount ?? existingCount) - (def.minCount ?? 1) + 1) + (def.minCount ?? 1));
+            input[def.name] = [];
+            for (let i = 0; i < amount; i++) {
+                const objInstance = objects[def.schema.name][Math.floor(rng() * existingCount)];
+                input[def.name].push(objInstance);
+            }
         }
-        input[paramName] = objects[schema.name];
     }
     return {
         action: action.name,
@@ -103,19 +120,18 @@ async function randomLog(
     const len = 3 + Math.floor(rng() * Math.min(12, maxLen));
     const stream: ActionLogEntry[] = [];
     for (let i = 0; i < len; i++) {
+        console.log(`Generating action ${i + 1} of ${len}`);
         let failedPreCondition = true;
         let failedPostCondition = true;
         let result: ActionLogEntry | undefined = undefined;
         while (failedPreCondition || failedPostCondition) {
+            console.log("Trying to generate action that meets conditions");
             const action = actions[Math.floor(rng() * actions.length)];
             const entry = await generateAction(action, personas, schemas, rng);
-
-            console.log("Generated entry:", entry);
 
             failedPreCondition = !action?.preConditions.every((constraint) =>
                 constraint.validate([...stream, entry], [], entry.input)
             );
-            console.log("PreCondition check:", failedPreCondition);
 
             if (action?.postConditions.length || 0 > 0) {
                 for (let j = 0; j < i; j++) {
@@ -140,12 +156,12 @@ async function randomLog(
     return stream;
 }
 
-export async function generatePollActions(
+export async function generateRandomFlow(
     ctx: DemoScriptContext,
-    personas: string[],
-    actions: Action[]
+    personas: string[]
 ): Promise<void> {
-    console.log(actions);
+    const actions = ctx.actions as Action[];
+    console.log(ctx.schemas);
     const rng = mulberry32(Math.floor(Math.random() * 1000000));
     const log: ActionLogEntry[] = await randomLog(personas, ctx.schemas, actions, 20, rng);
 

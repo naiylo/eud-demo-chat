@@ -12,6 +12,7 @@ import type {
   DemoActionImpact,
   HeuristicFinding,
 } from "../widgets/demoDiagnostics";
+import type { Action } from "../generics/actions";
 
 const summarizeTypes = (messages: Message[]) => {
   const counts = messages.reduce<Record<string, number>>((acc, msg) => {
@@ -119,7 +120,7 @@ export function WidgetPreviewDemo({
       deleteMessage: async () => {},
       setMessages: syncSetMessages,
       getMessagesSnapshot: () => messagesRef.current,
-    }) as Record<string, any>;
+    }) as Action[];
 
     return observer.wrap(baseActions);
   }, [widget]);
@@ -205,6 +206,7 @@ export function WidgetPreviewDemo({
       try {
         await script({
           actions: observedActions,
+          schemas: widget.schemas,
           wait,
           getMessages: () => messagesRef.current,
         });
@@ -215,7 +217,7 @@ export function WidgetPreviewDemo({
 
     isRunningRef.current = false;
     setIsRunning(false);
-  }, [activeStream, observedActions]);
+  }, [activeStream, observedActions, widget.schemas]);
 
   useEffect(() => {
     if (!activeStream) return;

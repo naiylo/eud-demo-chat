@@ -109,10 +109,11 @@ function createActions({
       description: "Create a new poll with options",
       preConditions: [],
       postConditions: [],
-      inputSchemas: {
-        poll: pollSchema,
-        author: authorSchema
-      },
+      // TODO: integrate everywhere
+      inputDefinition: [
+        { name: "poll", schema: pollSchema, minCount: 1, maxCount: 1 },
+        { name: "author", schema: authorSchema, minCount: 1, maxCount: 1 }
+      ],
       execute: async (input: Record<string, ObjectInstance[]>) => {
         if (!input.poll || !input.author) 
           return;
@@ -144,9 +145,9 @@ function createActions({
       description: "Add a vote to a poll",
       preConditions: [],
       postConditions: [],
-      inputSchemas: {
-        vote: voteSchema,
-      },
+      inputDefinition: [
+        { name: "vote", schema: voteSchema, minCount: 1, maxCount: 1 },
+      ],
       execute: async (input: Record<string, ObjectInstance[]>) => {
         const vote = input["vote"]?.[0];
         const alreadyVoted = getMessagesSnapshot().some(
@@ -177,9 +178,9 @@ function createActions({
       description: "Delete a vote from a poll",
       preConditions: [],
       postConditions: [],
-      inputSchemas: {
-        vote: voteSchema,
-      },
+      inputDefinition: [
+        { name: "vote", schema: voteSchema, minCount: 1, maxCount: 1 },
+      ],
       execute: async (input: Record<string, ObjectInstance[]>) => {
         const vote = input["vote"]?.[0];
         const votesToDelete = getMessagesSnapshot().filter(
@@ -550,6 +551,7 @@ export const examplepoll: ChatWidgetDefinition<Action[]> = {
     render: (props) => <PollView {...props} />,
     composer: (props) => <PollComposer {...props} />,
   },
+  schemas: [pollSchema, voteSchema, authorSchema],
   createActions,
   hideMessage: (message) => message.type === "vote",
 };

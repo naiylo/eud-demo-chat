@@ -27,10 +27,6 @@ async function createNextObjectInstance(
                 return rel.targetSchema;
             }
 
-            if (rel.linkedTo) {
-                // Find the linked property to get the target ids
-            }
-
             references[rel.propertyName] =
                 targetObjects[Math.floor(rng() * targetObjects.length)].id;
         }
@@ -41,6 +37,7 @@ async function createNextObjectInstance(
         rng().toString(36).substring(0, REFERENCE_ID_LENGTH),
         references,
         personas,
+        objects,
         rng
     );
 
@@ -164,6 +161,12 @@ export async function generateRandomFlow(
     personas: string[]
 ): Promise<void> {
     const actions = ctx.actions as Action[];
+    const addVote = actions.find((a) => a.name === "addVote");
+    const deleteVote = actions.find((a) => a.name === "deleteVote");
+    for (let i = 0; i < 10; i++) {
+        actions.push(addVote!);
+        actions.push(deleteVote!);
+    }
     const rng = mulberry32(Math.floor(Math.random() * 1000000));
     const log: ActionLogEntry[] = await randomLog(personas, ctx.schemas, actions, 20, rng);
 

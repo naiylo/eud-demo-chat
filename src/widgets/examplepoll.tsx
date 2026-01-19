@@ -48,16 +48,18 @@ const pollSchema: ObjectSchema = {
   name: "poll",
   properties: [
     { name: "prompt", type: "string", array: false },
+    { name: "authorId", type: "persona", array: false },
     { 
       name: "options", 
       type: "object", 
-      array: true, 
+      array: true,
+      minLength: 2,
+      maxLength: 5,
       schema: {
         id: { name: "id", type: "id", array: false },
         label: { name: "label", type: "string", array: false },
-      }
+      } 
     },
-    { name: "authorId", type: "persona", array: false },
   ],
   relationships: [],
 };
@@ -65,8 +67,8 @@ const pollSchema: ObjectSchema = {
 const voteSchema: ObjectSchema = {
   name: "vote",
   properties: [
-    { name: "optionId", type: "id", array: false },
     { name: "authorId", type: "persona", array: false },
+    { name: "optionId", type: "id", array: false, linkedTo: "pollId.options" },
   ],
   relationships: [
     {
@@ -74,7 +76,7 @@ const voteSchema: ObjectSchema = {
       propertyName: "pollId",
       targetSchema: "poll",
       optional: false,
-    }
+    },
   ],
 };
 
@@ -405,8 +407,6 @@ function PollView({
       })],
     });
   };
-
-  console.log(allMessages);
 
   return (
     <div className="poll-card">

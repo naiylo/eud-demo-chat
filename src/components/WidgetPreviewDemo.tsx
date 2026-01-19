@@ -377,7 +377,6 @@ export function WidgetPreviewDemo({
                     const findings = source
                       ? heuristicsByAction.get(source.id) ?? []
                       : [];
-                    const persona = personaLookup[msg.authorId];
 
                     return (
                       <div
@@ -394,7 +393,7 @@ export function WidgetPreviewDemo({
                           allMessages: messages,
                           personas: PREVIEW_PERSONAS,
                           currentActorId: msg.authorId,
-                          actions: observedActions as any,
+                          actions: observedActions,
                         })}
                       </div>
                     );

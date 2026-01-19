@@ -97,13 +97,12 @@ export const HEURISTIC_RULES: HeuristicRule[] = [
 ];
 
 export const DEMO_STREAMS: Record<string, DemoStream[]> = {
-  createPoll: [
+  examplepoll: [
     {
       id: "fuzzed-poll",
       "label": "Fuzzed poll flow",
       summary: "Generates a poll with random options and votes.",
       run: async (ctx) => {
-        console.log(ctx.actions)
         const personas = PREVIEW_PERSONAS.map((p) => p.id);
         await generateRandomFlow(ctx, personas);
       }

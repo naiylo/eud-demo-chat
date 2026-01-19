@@ -1,6 +1,8 @@
+import { getLoremIpsumSnippet } from "../generator/text";
+
 export type PropertyDefinition = {
   name: string;
-  type: "string" | "number" | "boolean" | "date" | "object" | "persona";
+  type: "string" | "number" | "boolean" | "date" | "object" | "persona" | "id";
   schema?: Record<string, PropertyDefinition>;
   array: boolean;
   required?: boolean;
@@ -15,6 +17,10 @@ export type RelationshipDefinition = {
   cardinality: "1:1" | "1:N" | "N:1" | "M:N";
   propertyName: string;
   targetSchema: string;
+  linkedTo?: string; // e.g. pollId.options for poll votes - TODO: implement in fuzzer by 
+  // pollId = property name to get the referenced object by id
+  // 1. checking property type - when id, directly link to id, when array, search for id type property in array items
+  // 2. when creating object instances, populate the linked property accordingly
   optional: boolean;
 };
 
@@ -22,7 +28,6 @@ export type ObjectInstance = {
   id: string;
   schema: ObjectSchema;
   properties: Record<string, unknown>;
-  references: Record<string, string | string[]>;
 };
 
 export type ObjectSchema = {
@@ -33,22 +38,19 @@ export type ObjectSchema = {
 
 export function newObjectInstance(schema: ObjectSchema, id: string, entries: Record<string, unknown>): ObjectInstance {
   const properties: Record<string, unknown> = {};
-  const references: Record<string, string | string[]> = {};
 
   for (const [key, value] of Object.entries(entries)) {
-    const propDef = schema.properties.find((p) => p.name === key);
-    if (propDef) {
+    if (schema.relationships.some(rel => rel.propertyName === key) || schema.properties.some(prop => prop.name === key)) {
       properties[key] = value;
     } else {
-      references[key] = value as string | string[];
+      console.warn(`Property ${key} is not defined in schema ${schema.name}`);
     }
   }
 
   return {
     id,
     schema,
-    properties,
-    references
+    properties
   }
 }
 
@@ -57,8 +59,7 @@ export function isObjectInstance(obj: any): obj is ObjectInstance {
     obj &&  typeof obj === "object" &&
     "id" in obj &&
     "schema" in obj &&
-    "properties" in obj &&
-    "references" in obj
+    "properties" in obj
   );
 }
 
@@ -69,7 +70,7 @@ export function isOfSchema(instance: ObjectInstance | null, schemaName: string):
 function randomProperty(propDef: PropertyDefinition, personas: string[], rng: () => number): unknown {
   switch (propDef.type) {
     case "string":
-      return rng().toString(36).substring(0, 10);
+      return getLoremIpsumSnippet(Math.floor(rng() * ((propDef.maxLength ?? 10) - (propDef.minLength ?? 1) + 1) + (propDef.minLength ?? 1)));
     case "number":
       { 
         const min = propDef.minValue ?? 0;
@@ -95,7 +96,9 @@ function randomProperty(propDef: PropertyDefinition, personas: string[], rng: ()
       return {};
     case "persona":
       return personas[Math.floor(rng() * personas.length)];
-    default:
+    case "id":
+      return rng().toString(36).substring(2, 10);
+    default:  
       return null;
   }
 }
@@ -113,7 +116,6 @@ export function randomObjectInstance(schema: ObjectSchema, id: string, reference
   return {
     id,
     schema,
-    properties,
-    references
+    properties: { ...properties, ...references },
   }
 }

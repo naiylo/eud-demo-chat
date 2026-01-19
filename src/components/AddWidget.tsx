@@ -10,6 +10,7 @@ import {
 } from "../widgets/demoDiagnostics";
 import type { DemoActionImpact } from "../widgets/demoDiagnostics";
 import { WidgetPreviewDemo } from "./WidgetPreviewDemo";
+import type { Action } from "../generics/actions";
 
 const widgetGlobal = globalThis as typeof globalThis & {
   __widgetReact?: typeof React;
@@ -258,7 +259,7 @@ export function AddWidget() {
             deleteMessage: async () => {},
             setMessages,
             getMessagesSnapshot: () => messages,
-          }) as Record<string, any>
+          }) as Action[]
         );
 
         const wait = async (ms = 0) =>
@@ -267,6 +268,7 @@ export function AddWidget() {
         try {
           await stream.run({
             actions: observedActions,
+            schemas: widget.schemas,
             wait,
             getMessages: () => messages,
           });

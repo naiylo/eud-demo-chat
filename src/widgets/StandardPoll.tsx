@@ -198,6 +198,7 @@ function PollView({
   currentActorId,
   actions,
 }: WidgetRenderProps<PollActions>) {
+  console.log("PollView message:", message);
   if (!isPollCustom(message.custom)) {
     return <p>Poll is missing configuration.</p>;
   }

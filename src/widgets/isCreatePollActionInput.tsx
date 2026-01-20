@@ -6,6 +6,7 @@ import type {
   WidgetComposerProps,
   WidgetRenderProps,
 } from "../widgets/types";
+import type { Action, ConditionInput, Constraint } from "../generator/fuzzer";
 
 type PollOption = { id: string; label: string };
 
@@ -29,102 +30,172 @@ const isVoteCustom = (custom: unknown): custom is VoteCustom =>
   typeof (custom as VoteCustom).pollId === "string" &&
   typeof (custom as VoteCustom).optionId === "string";
 
-type PollActions = {
-  createPoll: (
-    poll: Pick<PollCustom, "prompt" | "options">,
-    authorId: string
-  ) => Promise<string | undefined>;
-  addVote: (
-    pollId: string,
-    optionId: string,
-    authorId: string
-  ) => Promise<void>;
-  deleteVote: (pollId: string, authorId: string) => Promise<void>;
-};
+export type CreatePollActionInput = {
+    poll: Pick<PollCustom, "prompt" | "options">;
+    id: string;
+    authorId: string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const isCreatePollActionInput = (input: any): input is CreatePollActionInput => {
+    return (
+        input &&
+        typeof input === "object" &&
+        typeof input.authorId === "string" &&
+        input.poll &&
+        typeof input.poll === "object" &&
+        typeof input.poll.prompt === "string" &&
+        Array.isArray(input.poll.options) &&
+        input.poll.options.every(
+            (opt: unknown) =>
+                opt &&
+                typeof opt === "object" &&
+                typeof (opt as { id?: unknown }).id === "string" &&
+                typeof (opt as { label?: unknown }).label === "string"
+        )
+    );
+}
+
+export type AddVoteActionInput = {
+    pollId: string;
+    optionId: string;
+    authorId: string;
+}
+
+export const isAddVoteActionInput = (input: unknown): input is AddVoteActionInput => {
+    return (
+        !!input &&
+        typeof (input as AddVoteActionInput).pollId === "string" &&
+        typeof (input as AddVoteActionInput).optionId === "string" &&
+        typeof (input as AddVoteActionInput).authorId === "string"
+    );
+}
+
+export type ConstraintInput = {
+  pollId: string;
+  authorId: string;
+}
+
+export type DeleteVoteActionInput = {
+  pollId: string;
+  authorId: string;
+}
+
+export const isDeleteVoteActionInput = (input: unknown): input is DeleteVoteActionInput => {
+    return (
+        !!input &&
+        typeof (input as DeleteVoteActionInput).pollId === "string" &&
+        typeof (input as DeleteVoteActionInput).authorId === "string"
+    );
+}
+
+class CreatePollPreCondition implements Constraint {
+    name = "CreatePollPreCondition";
+    description = "No precondition for creating a poll";
+    validate(input: ConditionInput): boolean {
+        return true;
+    }
+}
+
+export type PollActionInput = CreatePollActionInput | AddVoteActionInput | DeleteVoteActionInput;
 
 function createActions({
   addMessage,
   deleteMessage,
   setMessages,
   getMessagesSnapshot,
-}: WidgetActionDeps): PollActions {
-  const createPoll: PollActions["createPoll"] = async (poll, authorId) => {
-    if (!poll.prompt.trim() || poll.options.length < 2) return;
-    const id = `poll-${Date.now()}`;
-    const msg: Message = {
-      id,
-      authorId,
-      text: poll.prompt.trim(),
-      timestamp: new Date().toISOString(),
-      type: "createPoll",
-      custom: poll,
-    };
-    await addMessage(msg);
-    setMessages((cur) => [...cur, msg]);
-    return id;
-  };
-
-  const addVote: PollActions["addVote"] = async (
-    pollId,
-    optionId,
-    authorId
-  ) => {
-    const alreadyVoted = getMessagesSnapshot().some(
-      (m) =>
-        m.type === "vote" &&
-        isVoteCustom(m.custom) &&
-        m.custom.pollId === pollId &&
-        m.authorId === authorId
-    );
-    if (alreadyVoted) return;
-
-    const vote: Message = {
-      id: `vote-${Date.now()}`,
-      authorId,
-      text: "",
-      timestamp: new Date().toISOString(),
-      type: "vote",
-      custom: { pollId, optionId } satisfies VoteCustom,
-    };
-    setMessages((cur) => [...cur, vote]);
-    await addMessage(vote);
-  };
-
-  const deleteVote: PollActions["deleteVote"] = async (pollId, authorId) => {
-    const votesToDelete = getMessagesSnapshot().filter(
-      (m) =>
-        m.type === "vote" &&
-        isVoteCustom(m.custom) &&
-        m.custom.pollId === pollId &&
-        m.authorId === authorId
-    );
-    if (!votesToDelete.length) return;
-
-    setMessages((cur) =>
-      cur.filter(
-        (m) =>
-          !(
-            m.type === "vote" &&
-            isVoteCustom(m.custom) &&
-            m.custom.pollId === pollId &&
-            m.authorId === authorId
-          )
-      )
-    );
-
-    for (const vote of votesToDelete) {
-      await deleteMessage(vote.id);
+}: WidgetActionDeps): Action[] {
+  const createPoll: Action = {
+    name: "createPoll",
+    description: "Create a new poll with options",
+    preConditions: [
+      new CreatePollPreCondition()
+    ],
+    postConditions: [],
+    execute: async (input: CreatePollActionInput) => {
+      if (!input.poll.prompt.trim() || input.poll.options.length < 2) return;
+      const msg: Message = {
+        id: input.id,
+        authorId: input.authorId,
+        text: input.poll.prompt.trim(),
+        timestamp: new Date().toISOString(),
+        type: "createPoll",
+        custom: input.poll,
+      };
+      await addMessage(msg);
+      setMessages((cur) => [...cur, msg]);
     }
   };
 
-  return { createPoll, addVote, deleteVote };
+  const addVote: Action = {
+    name: "addVote",
+    description: "Add a vote to a poll",
+    preConditions: [],
+    postConditions: [],
+    execute: async (input: AddVoteActionInput) => {
+      const alreadyVoted = getMessagesSnapshot().some(
+      (m) =>
+        m.type === "vote" &&
+        isVoteCustom(m.custom) &&
+        m.custom.pollId === input.pollId &&
+        m.authorId === input.authorId
+      );
+      if (alreadyVoted) return;
+
+      const vote: Message = {
+        id: `vote-${Date.now()}`,
+        authorId: input.authorId,
+        text: "",
+        timestamp: new Date().toISOString(),
+        type: "vote",
+        custom: { pollId: input.pollId, optionId: input.optionId } satisfies VoteCustom,
+      };
+      setMessages((cur) => [...cur, vote]);
+      await addMessage(vote);
+    }
+  };
+
+  const deleteVote: Action = {
+    name: "deleteVote",
+    description: "Delete a vote from a poll",
+    preConditions: [],
+    postConditions: [],
+    execute: async (input: DeleteVoteActionInput) => {
+      const votesToDelete = getMessagesSnapshot().filter(
+        (m) =>
+          m.type === "vote" &&
+          isVoteCustom(m.custom) &&
+          m.custom.pollId === input.pollId &&
+        m.authorId === input.authorId
+      );
+      if (!votesToDelete.length) return;
+
+      setMessages((cur) =>
+        cur.filter(
+          (m) =>
+            !(
+              m.type === "vote" &&
+              isVoteCustom(m.custom) &&
+              m.custom.pollId === input.pollId &&
+              m.authorId === input.authorId
+            )
+        )
+      );
+
+      for (const vote of votesToDelete) {
+        await deleteMessage(vote.id);
+      }
+    }
+  };
+
+  return [createPoll, addVote, deleteVote];
 }
 
 function PollComposer({
   actions,
   authorId,
   onClose,
-}: WidgetComposerProps<PollActions>) {
+}: WidgetComposerProps<Action[]>) {
   const [prompt, setPrompt] = useState("");
   const [options, setOptions] = useState<PollOption[]>([
     { id: "opt-0", label: "" },
@@ -148,10 +219,11 @@ function PollComposer({
       .map((opt) => ({ ...opt, label: opt.label.trim() }))
       .filter((opt) => opt.label);
     if (!prompt.trim() || trimmedOptions.length < 2) return;
-    await actions.createPoll(
-      { prompt: prompt.trim(), options: trimmedOptions },
-      authorId
-    );
+    const action = actions.find((a) => a.name === "createPoll");
+    await action?.execute({
+      poll: { prompt: prompt.trim(), options: trimmedOptions },
+      authorId, id: `poll-${Date.now()}`
+    });
     setPrompt("");
     setOptions([
       { id: "opt-0", label: "" },
@@ -197,8 +269,7 @@ function PollView({
   personas,
   currentActorId,
   actions,
-}: WidgetRenderProps<PollActions>) {
-  console.log("PollView message:", message);
+}: WidgetRenderProps<Action[]>) {
   if (!isPollCustom(message.custom)) {
     return <p>Poll is missing configuration.</p>;
   }
@@ -221,19 +292,21 @@ function PollView({
   );
   const totalVotes = votes.length;
   const myVote = votes.find((v) => v.authorId === currentActorId);
+  const addVoteAction = actions.find((a) => a.name === "addVote");
+  const deleteVoteAction = actions.find((a) => a.name === "deleteVote");
 
   const handleVote = async (optionId: string) => {
-    if (!actions.addVote || !actions.deleteVote) return;
+    if (!addVoteAction || !deleteVoteAction) return;
     if (!myVote) {
-      await actions.addVote(message.id, optionId, currentActorId);
+      await addVoteAction.execute({ pollId: message.id, optionId, authorId: currentActorId });
       return;
     }
     if (myVote.custom.optionId === optionId) {
-      await actions.deleteVote(message.id, currentActorId);
+      await deleteVoteAction.execute({ pollId: message.id, authorId: currentActorId });
       return;
     }
-    await actions.deleteVote(message.id, currentActorId);
-    await actions.addVote(message.id, optionId, currentActorId);
+    await deleteVoteAction.execute({ pollId: message.id, authorId: currentActorId });
+    await addVoteAction.execute({ pollId: message.id, optionId, authorId: currentActorId });
   };
 
   return (
@@ -426,9 +499,9 @@ if (
   document.head.appendChild(style);
 }
 
-export const StandardPoll: ChatWidgetDefinition<PollActions> = {
+export const examplepoll: ChatWidgetDefinition<Action[]> = {
   type: "createPoll",
-  registryName: "StandardPoll",
+  registryName: "examplepoll",
   elements: {
     render: (props) => <PollView {...props} />,
     composer: (props) => <PollComposer {...props} />,

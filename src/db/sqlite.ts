@@ -1,6 +1,7 @@
 import initSqlJs from "sql.js/dist/sql-wasm.js";
 import type { Database, SqlJsStatic } from "sql.js";
 import sqlWasm from "sql.js/dist/sql-wasm.wasm?url";
+import type { ObjectInstance } from "../generics/objects";
 
 const KEY = "chat_personas_db_v1";
 
@@ -28,7 +29,7 @@ export interface Persona {
 // Base message type. Widgets can register additional types dynamically, so keep this open.
 export type MessageType = "message" | string;
 
-export type MessageCustom = unknown;
+export type MessageCustom = ObjectInstance | null;
 
 export interface Message {
   id: string;
@@ -61,7 +62,7 @@ export async function getDB(): Promise<Database> {
       text TEXT NOT NULL,
       timestamp TEXT NOT NULL,
       type TEXT NOT NULL,
-      custom TEXT NOT NULL, -- z.B. JSON-String
+      custom TEXT,
       FOREIGN KEY(authorId) REFERENCES personas(id)
     );
   `);
@@ -77,7 +78,7 @@ export async function getDB(): Promise<Database> {
         ('pm','Sasha','#00a676','Product strategist keeping the team aligned with users.');
 
       INSERT INTO messages (id,authorId,text,timestamp,type,custom) VALUES
-        ('m1','designer','Hello world','2025-01-01T10:00:00.000Z','message','[]');
+        ('m1','designer','Hello world','2025-01-01T10:00:00.000Z','message',NULL);
     `);
     persist();
   }
@@ -107,11 +108,11 @@ export async function getPersonas(): Promise<Persona[]> {
 
 function parseCustom(raw: string): MessageCustom {
   try {
-    const parsed = JSON.parse(raw) as unknown;
-    return parsed ?? [];
+    const parsed = JSON.parse(raw) as MessageCustom;
+    return parsed ?? null;
   } catch (err) {
     console.warn("Failed to parse custom message payload", err);
-    return [];
+    return null;
   }
 }
 

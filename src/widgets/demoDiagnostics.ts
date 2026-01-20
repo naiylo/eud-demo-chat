@@ -1,4 +1,7 @@
 import type { Message, Persona } from "../db/sqlite";
+import { generateRandomFlow } from "../generator/fuzzer";
+import type { Action } from "../generics/actions";
+import type { ObjectSchema } from "../generics/objects";
 
 export const PREVIEW_PERSONAS: Persona[] = [
   { id: "designer", name: "Oskar", color: "#e86a92", bio: "" },
@@ -36,7 +39,8 @@ export type HeuristicFinding = {
 };
 
 export type DemoScriptContext = {
-  actions: unknown;
+  actions: Action[];
+  schemas: ObjectSchema[],
   wait: (ms: number) => Promise<void>;
   getMessages: () => Message[];
 };
@@ -93,131 +97,140 @@ export const HEURISTIC_RULES: HeuristicRule[] = [
 ];
 
 export const DEMO_STREAMS: Record<string, DemoStream[]> = {
-  createPoll: [
+  examplepoll: [
     {
-      id: "one-poll",
-      label: "Single poll flow",
-      summary: "Creates a poll, collects votes, and deletes one vote.",
-      run: async ({ actions, wait, getMessages }) => {
-        const pollActions = actions as {
-          createPoll?: (
-            poll: { prompt: string; options: { id: string; label: string }[] },
-            authorId: string
-          ) => Promise<string | undefined>;
-          addVote?: (
-            pollId: string,
-            optionId: string,
-            authorId: string
-          ) => Promise<void>;
-          deleteVote?: (pollId: string, authorId: string) => Promise<void>;
-        };
-
-        const prompt = "Product direction";
-        const options = [
-          { id: "opt-preview-a", label: "Ship MVP" },
-          { id: "opt-preview-b", label: "Polish for two more weeks" },
-        ];
-
-        const createAndResolveId = async (
-          p: string,
-          opts: { id: string; label: string }[]
-        ) => {
-          const createdId = await pollActions.createPoll(
-            { prompt: p, options: opts },
-            "engineer"
-          );
-          return (
-            createdId ??
-            getMessages().find(
-              (m) =>
-                m.type === "createPoll" &&
-                typeof (m.custom as any)?.prompt === "string" &&
-                (m.custom as any).prompt === p
-            )?.id
-          );
-        };
-
-        const pollId = await createAndResolveId(prompt, options);
-
-        await wait(5);
-        await pollActions.addVote(pollId, "opt-preview-a", "engineer");
-        await wait(5);
-        await pollActions.addVote(pollId, "opt-preview-b", "designer");
-        await wait(5);
-        await pollActions.addVote(pollId, "opt-preview-a", "chief");
-        await wait(5);
-        await pollActions.deleteVote(pollId, "designer");
-        await wait(0);
-      },
+      id: "fuzzed-poll",
+      "label": "Fuzzed poll flow",
+      summary: "Generates a poll with random options and votes.",
+      run: async (ctx) => {
+        const personas = PREVIEW_PERSONAS.map((p) => p.id);
+        await generateRandomFlow(ctx, personas);
+      }
     },
-    {
-      id: "two-polls",
-      label: "Two polls flow",
-      summary: "Creates two polls with votes across both threads.",
-      run: async ({ actions, wait, getMessages }) => {
-        const pollActions = actions as {
-          createPoll?: (
-            poll: { prompt: string; options: { id: string; label: string }[] },
-            authorId: string
-          ) => Promise<string | undefined>;
-          addVote?: (
-            pollId: string,
-            optionId: string,
-            authorId: string
-          ) => Promise<void>;
-          deleteVote?: (pollId: string, authorId: string) => Promise<void>;
-        };
+    // {
+    //   id: "one-poll",
+    //   label: "Single poll flow",
+    //   summary: "Creates a poll, collects votes, and deletes one vote.",
+    //   run: async ({ actions, wait, getMessages }) => {
+    //     const pollActions = actions as {
+    //       createPoll?: (
+    //         poll: { prompt: string; options: { id: string; label: string }[] },
+    //         authorId: string
+    //       ) => Promise<string | undefined>;
+    //       addVote?: (
+    //         pollId: string,
+    //         optionId: string,
+    //         authorId: string
+    //       ) => Promise<void>;
+    //       deleteVote?: (pollId: string, authorId: string) => Promise<void>;
+    //     };
 
-        const prompt = "Product direction";
-        const options = [
-          { id: "opt-preview-a", label: "Ship MVP" },
-          { id: "opt-preview-b", label: "Polish for two more weeks" },
-        ];
+    //     const prompt = "Product direction";
+    //     const options = [
+    //       { id: "opt-preview-a", label: "Ship MVP" },
+    //       { id: "opt-preview-b", label: "Polish for two more weeks" },
+    //     ];
 
-        const prompt2 = "Design direction";
-        const options2 = [
-          { id: "opt-preview-c", label: "Keep current look" },
-          { id: "opt-preview-d", label: "Refresh theme" },
-        ];
+    //     const createAndResolveId = async (
+    //       p: string,
+    //       opts: { id: string; label: string }[]
+    //     ) => {
+    //       const createdId = await pollActions.createPoll(
+    //         { prompt: p, options: opts },
+    //         "engineer"
+    //       );
+    //       return (
+    //         createdId ??
+    //         getMessages().find(
+    //           (m) =>
+    //             m.type === "createPoll" &&
+    //             typeof (m.custom as any)?.prompt === "string" &&
+    //             (m.custom as any).prompt === p
+    //         )?.id
+    //       );
+    //     };
 
-        const createAndResolveId = async (
-          p: string,
-          opts: { id: string; label: string }[]
-        ) => {
-          const createdId = await pollActions.createPoll(
-            { prompt: p, options: opts },
-            "engineer"
-          );
-          return (
-            createdId ??
-            getMessages().find(
-              (m) =>
-                m.type === "createPoll" &&
-                typeof (m.custom as any)?.prompt === "string" &&
-                (m.custom as any).prompt === p
-            )?.id
-          );
-        };
+    //     const pollId = await createAndResolveId(prompt, options);
 
-        const pollId = await createAndResolveId(prompt, options);
-        await wait(5);
-        const pollId2 = await createAndResolveId(prompt2, options2);
+    //     await wait(5);
+    //     await pollActions.addVote(pollId, "opt-preview-a", "engineer");
+    //     await wait(5);
+    //     await pollActions.addVote(pollId, "opt-preview-b", "designer");
+    //     await wait(5);
+    //     await pollActions.addVote(pollId, "opt-preview-a", "chief");
+    //     await wait(5);
+    //     await pollActions.deleteVote(pollId, "designer");
+    //     await wait(0);
+    //   },
+    // },
+    // {
+    //   id: "two-polls",
+    //   label: "Two polls flow",
+    //   summary: "Creates two polls with votes across both threads.",
+    //   run: async ({ actions, wait, getMessages }) => {
+    //     const pollActions = actions as {
+    //       createPoll?: (
+    //         poll: { prompt: string; options: { id: string; label: string }[] },
+    //         authorId: string
+    //       ) => Promise<string | undefined>;
+    //       addVote?: (
+    //         pollId: string,
+    //         optionId: string,
+    //         authorId: string
+    //       ) => Promise<void>;
+    //       deleteVote?: (pollId: string, authorId: string) => Promise<void>;
+    //     };
 
-        await wait(5);
-        await pollActions.addVote(pollId, "opt-preview-a", "engineer");
-        await wait(5);
-        await pollActions.addVote(pollId, "opt-preview-b", "designer");
-        await wait(5);
-        await pollActions.addVote(pollId, "opt-preview-a", "chief");
-        await wait(5);
-        await pollActions.addVote(pollId2, "opt-preview-d", "designer");
-        await wait(5);
-        await pollActions.addVote(pollId2, "opt-preview-d", "chief");
-        await wait(5);
-        await pollActions.deleteVote(pollId, "designer");
-        await wait(0);
-      },
-    },
+    //     const prompt = "Product direction";
+    //     const options = [
+    //       { id: "opt-preview-a", label: "Ship MVP" },
+    //       { id: "opt-preview-b", label: "Polish for two more weeks" },
+    //     ];
+
+    //     const prompt2 = "Design direction";
+    //     const options2 = [
+    //       { id: "opt-preview-c", label: "Keep current look" },
+    //       { id: "opt-preview-d", label: "Refresh theme" },
+    //     ];
+
+    //     const createAndResolveId = async (
+    //       p: string,
+    //       opts: { id: string; label: string }[]
+    //     ) => {
+    //       const createdId = await pollActions.createPoll(
+    //         { prompt: p, options: opts },
+    //         "engineer"
+    //       );
+    //       return (
+    //         createdId ??
+    //         getMessages().find(
+    //           (m) =>
+    //             m.type === "createPoll" &&
+    //             typeof (m.custom as any)?.prompt === "string" &&
+    //             (m.custom as any).prompt === p
+    //         )?.id
+    //       );
+    //     };
+
+    //     const pollId = await createAndResolveId(prompt, options);
+    //     await wait(5);
+    //     const pollId2 = await createAndResolveId(prompt2, options2);
+
+    //     await wait(5);
+    //     await pollActions.addVote(pollId, "opt-preview-a", "engineer");
+    //     await wait(5);
+    //     await pollActions.addVote(pollId, "opt-preview-b", "designer");
+    //     await wait(5);
+    //     await pollActions.addVote(pollId, "opt-preview-a", "chief");
+    //     await wait(5);
+    //     await pollActions.addVote(pollId2, "opt-preview-d", "designer");
+    //     await wait(5);
+    //     await pollActions.addVote(pollId2, "opt-preview-d", "chief");
+    //     await wait(5);
+    //     await pollActions.deleteVote(pollId, "designer");
+    //     await wait(0);
+    //   },
+    // },
   ],
 };
 
@@ -245,18 +258,12 @@ export class DemoDatabaseObserver {
     this.onChange = onChange;
   }
 
-  wrap<T extends Record<string, any>>(actions: T): T {
-    const wrapped: Record<string, any> = {};
-
-    Object.entries(actions).forEach(([key, value]) => {
-      if (typeof value !== "function") {
-        wrapped[key] = value;
-        return;
-      }
-
-      wrapped[key] = async (...args: any[]) => {
+  wrap(actions: Action[]): Action[] {
+    actions.forEach((action) => {
+      const originalExecute = action.execute;
+      action.execute = async (input) => {
         const before = [...this.getSnapshot()];
-        const result = await value(...args);
+        const result = await originalExecute.call(action, input);
         await Promise.resolve();
         const after = [...this.getSnapshot()];
 
@@ -264,7 +271,7 @@ export class DemoDatabaseObserver {
         const deleted = before.filter((b) => !after.some((a) => a.id === b.id));
 
         this.onChange({
-          action: key,
+          action: action.name,
           added,
           deleted,
           beforeCount: before.length,
@@ -275,7 +282,7 @@ export class DemoDatabaseObserver {
       };
     });
 
-    return wrapped as T;
+    return actions;
   }
 }
 

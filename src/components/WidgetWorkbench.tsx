@@ -2,19 +2,20 @@ import { useState } from "react";
 import type { ChatWidgetDefinition, WidgetActionMap } from "../widgets/types";
 import { AddWidget } from "./AddWidget";
 import { WidgetDemoTab } from "./WidgetDemoTab";
+import type { Persona } from "../db/sqlite";
 
 export function WidgetWorkbench({
   open,
   onClose,
   widgets,
   widgetActions,
-  selectedAuthorId,
+  selectedAuthor,
 }: {
   open: boolean;
   onClose: () => void;
   widgets: ChatWidgetDefinition[];
   widgetActions: WidgetActionMap;
-  selectedAuthorId: string;
+  selectedAuthor: Persona;
 }) {
   const ADD_WIDGET_KEY = "addWidget";
   const DEMO_TAB_KEY = "__demo__";
@@ -51,7 +52,7 @@ export function WidgetWorkbench({
     const key = currentComposer.registryName ?? currentComposer.type;
     return currentComposer.elements.composer({
       actions: widgetActions[key],
-      authorId: selectedAuthorId,
+      author: selectedAuthor,
       onClose,
     });
   };

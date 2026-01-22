@@ -73,9 +73,9 @@ export async function getDB(): Promise<Database> {
   if (!count) {
     db.exec(`
       INSERT INTO personas (id,name,color,bio) VALUES
-        ('designer','Riley','#e86a92','Visual storyteller who cares about delightful interactions.'),
-        ('engineer','Noah','#0075ff','Systems thinker focused on stability and automation.'),
-        ('pm','Sasha','#00a676','Product strategist keeping the team aligned with users.');
+        ('designer','Oskar','#e86a92','Visual storyteller who cares about delightful interactions.'),
+        ('engineer','Sebastian','#0075ff','Systems thinker focused on stability and automation.'),
+        ('pm','Tom','#00a676','Product strategist keeping the team aligned with users.');
 
       INSERT INTO messages (id,authorId,text,timestamp,type,custom) VALUES
         ('m1','designer','Hello world','2025-01-01T10:00:00.000Z','message',NULL);

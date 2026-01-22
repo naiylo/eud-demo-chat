@@ -100,17 +100,19 @@ export const HEURISTIC_RULES: HeuristicRule[] = [
 export const DEMO_STREAMS: Record<string, DemoStream[]> = {};
 
 widgetRegistry.forEach((widget) => {
-  DEMO_STREAMS[widget.type] = [
-    {
-      id: "fuzzed-stream",
-      "label": "Fuzzed stream flow",
-      summary: "Generates a randomized stream of actions for the widget.",
+  DEMO_STREAMS[widget.type] = [];
+
+  for (let i = 0; i < 10; i++) {
+    DEMO_STREAMS[widget.type].push({
+      id: `random-stream-${i + 1}`,
+      label: `Random stream flow ${i + 1}`,
+      summary: `Generates a randomized stream of actions for the widget.`,
       run: async (ctx) => {
         const personas = PREVIEW_PERSONAS.map((p) => p.id);
         await generateRandomFlow(ctx, personas);
       }
-    }
-  ];
+    });
+  }
 });
 
 export class DemoDatabaseObserver {

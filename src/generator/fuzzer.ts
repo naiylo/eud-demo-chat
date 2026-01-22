@@ -9,7 +9,7 @@ import { mulberry32 } from "./prng";
 
 const REFERENCE_ID_LENGTH = 16;
 
-const objects: Record<string, ObjectInstance[]> = {};
+let objects: Record<string, ObjectInstance[]> = {};
 
 async function createNextObjectInstance(
     schema: ObjectSchema,
@@ -149,7 +149,7 @@ async function randomLog(
             }
 
             result = entry;
-            console.log(`Used action ${action.name}, failedPreCondition: ${failedPreCondition}, failedPostCondition: ${failedPostCondition}`);
+            //console.log(`Used action ${action.name}, failedPreCondition: ${failedPreCondition}, failedPostCondition: ${failedPostCondition}`);
         }
         if (result) stream.push(result);
     }
@@ -160,21 +160,22 @@ export async function generateRandomFlow(
     ctx: DemoScriptContext,
     personas: string[]
 ): Promise<void> {
+    objects = {};
     const actions = ctx.actions as Action[];
     const addVote = actions.find((a) => a.name === "addVote");
     const deleteVote = actions.find((a) => a.name === "deleteVote");
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 25; i++) {
         actions.push(addVote!);
         actions.push(deleteVote!);
     }
     const rng = mulberry32(Math.floor(Math.random() * 1000000));
-    const log: ActionLogEntry[] = await randomLog(personas, ctx.schemas, actions, 20, rng);
+    const log: ActionLogEntry[] = await randomLog(personas, ctx.schemas, actions, 50, rng);
 
     for (const entry of log) {
         const action = actions.find((a) => a.name === entry.action);
         if (action) {
             await action.execute(entry.input);
         }
-        await ctx.wait(2000);
+        await ctx.wait(1);
     }
 }

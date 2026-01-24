@@ -55,43 +55,50 @@ export type DemoStream = {
 
 export const HEURISTIC_RULES: HeuristicRule[] = [
   {
-    id: "deleteVote-multi",
-    label: "deleteVote removed multiple votes",
+    id: "deleted-multiple-messages",
+    label: "Action removed multiple messages",
     severity: "weird",
     evaluate: (action) => {
-      const removedVotes = action.deleted.filter(
-        (m) => m.type === "brokenvote"
-      ).length;
+      const removed = action.deleted.length;
       return {
-        hit: action.action === "deleteVote" && removedVotes > 1,
-        detail: `Removed ${removedVotes} vote messages`,
+        hit: removed > 1,
+        detail: `Removed ${removed} messages`,
       };
     },
   },
   {
-    id: "addVote-noop",
-    label: "addVote executed without DB change",
+    id: "no-db-change",
+    label: "Action executed without DB change",
     severity: "warn",
     evaluate: (action) => ({
       hit:
-        action.action === "addVote" &&
         action.added.length === 0 &&
         action.deleted.length === 0 &&
         action.beforeCount === action.afterCount,
-      detail: "Action returned but did not persist a vote",
+      detail: "Action returned but did not persist a change to the database",
     }),
   },
   {
-    id: "createPoll-multi",
-    label: "createPoll produced multiple records",
+    id: "multiple-identical-messages",
+    label: "Action created multiple identical messages",
     severity: "warn",
     evaluate: (action) => {
-      const pollsCreated = action.added.filter(
-        (m) => m.type === "brokenpoll"
-      ).length;
+      const messagesCreated = action.added.length;
       return {
-        hit: action.action === "createPoll" && pollsCreated > 1,
-        detail: `Created ${pollsCreated} poll payloads`,
+        hit: messagesCreated > 1 && new Set(action.added.map((m) => m.text)).size === 1,
+        detail: `Created ${messagesCreated} identical messages`,
+      };
+    },
+  },
+  {
+    id: "empty-message-created",
+    label: "Action created empty message(s)",
+    severity: "weird",
+    evaluate: (action) => {
+      const messagesCreated = action.added.length;
+      return {
+        hit: messagesCreated > 0 && action.added.some((m) => m.text.trim() === ""),
+        detail: `Created ${messagesCreated} empty message(s)`,
       };
     },
   },

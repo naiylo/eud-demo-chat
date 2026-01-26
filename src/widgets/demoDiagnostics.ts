@@ -112,7 +112,7 @@ widgetRegistry.forEach((widget) => {
   for (let i = 0; i < 10; i++) {
     DEMO_STREAMS[widget.type].push({
       id: `random-stream-${i + 1}`,
-      label: `Random stream flow ${i + 1}`,
+      label: `Stream ${i + 1}`,
       summary: `Generates a randomized stream of actions for the widget.`,
       run: async (ctx) => {
         const personas = PREVIEW_PERSONAS.map((p) => p.id);

@@ -591,18 +591,18 @@ export function WidgetPreviewDemo({
               <div>
                 <h3 className="analytics-label">Play demo</h3>
                 <p className="analytics-note">
-                  Accept keeps the current stream; Continue swaps in the next
-                  one until you reach the final stream.
+                  Continue swaps in the next
+                  stream until you reach the final stream.
                 </p>
               </div>
               <div className="analytics-nav">
-                <button
+                {/* <button
                   className="analytics-secondary"
                   onClick={handleAccept}
                   disabled={!activeStream}
                 >
                   Accept
-                </button>
+                </button> */}
                 <button
                   className="analytics-secondary"
                   onClick={handleContinue}
@@ -618,7 +618,7 @@ export function WidgetPreviewDemo({
               </div>
             </div>
 
-            <div className="analytics-panel analytics-panel--nav">
+            {/* <div className="analytics-panel analytics-panel--nav">
               <div>
                 <h3 className="analytics-label">Switch context</h3>
                 <p className="analytics-note">
@@ -640,7 +640,7 @@ export function WidgetPreviewDemo({
                   User demo view
                 </button>
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>

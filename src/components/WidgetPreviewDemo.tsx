@@ -72,10 +72,10 @@ export function WidgetPreviewDemo({
 
   const renderer = widget.elements?.render ?? (widget as any)?.render;
   const streamList = useMemo(() => {
-    const streams = DEMO_STREAMS[widget.type] ?? [];
+    const streams = DEMO_STREAMS ?? [];
     if (!streamFilter?.length) return streams;
     return streams.filter((stream) => streamFilter.includes(stream.id));
-  }, [widget.type, streamFilter]);
+  }, [streamFilter]);
   const activeStream = streamList[streamIndex];
   const isLastStream =
     streamList.length > 0 && streamIndex === streamList.length - 1;

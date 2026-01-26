@@ -220,7 +220,7 @@ export function AddWidget() {
         return;
       }
 
-      const streams = DEMO_STREAMS[widget.type] ?? [];
+      const streams = DEMO_STREAMS ?? [];
       const failingStreams: { id: string; label: string }[] = [];
 
       for (const stream of streams) {

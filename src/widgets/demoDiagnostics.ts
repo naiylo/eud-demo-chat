@@ -2,7 +2,6 @@ import type { Message, Persona } from "../db/sqlite";
 import { generateRandomFlow } from "../generator/fuzzer";
 import type { Action } from "../generics/actions";
 import type { ObjectSchema } from "../generics/objects";
-import { widgetRegistry } from "./registry";
 
 export const PREVIEW_PERSONAS: Persona[] = [
   { id: "designer", name: "Oskar", color: "#e86a92", bio: "" },
@@ -104,23 +103,19 @@ export const HEURISTIC_RULES: HeuristicRule[] = [
   },
 ];
 
-export const DEMO_STREAMS: Record<string, DemoStream[]> = {};
+export const DEMO_STREAMS: DemoStream[] = [];
 
-widgetRegistry.forEach((widget) => {
-  DEMO_STREAMS[widget.type] = [];
-
-  for (let i = 0; i < 10; i++) {
-    DEMO_STREAMS[widget.type].push({
-      id: `random-stream-${i + 1}`,
-      label: `Stream ${i + 1}`,
-      summary: `Generates a randomized stream of actions for the widget.`,
-      run: async (ctx) => {
-        const personas = PREVIEW_PERSONAS.map((p) => p.id);
-        await generateRandomFlow(ctx, personas);
-      }
-    });
-  }
-});
+for (let i = 0; i < 10; i++) {
+  DEMO_STREAMS.push({
+    id: `random-stream-${i + 1}`,
+    label: `Stream ${i + 1}`,
+    summary: `Generates a randomized stream of actions for the widget.`,
+    run: async (ctx) => {
+      const personas = PREVIEW_PERSONAS.map((p) => p.id);
+      await generateRandomFlow(ctx, personas);
+    }
+  });
+}
 
 export class DemoDatabaseObserver {
   private getSnapshot: () => Message[];

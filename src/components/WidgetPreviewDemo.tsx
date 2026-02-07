@@ -13,6 +13,7 @@ import type {
   HeuristicFinding,
 } from "../widgets/demoDiagnostics";
 import type { Action } from "../generics/actions";
+import { analyzeDependencies } from "../generator/fuzzer";
 
 const summarizeTypes = (messages: Message[]) => {
   const counts = messages.reduce<Record<string, number>>((acc, msg) => {
@@ -122,7 +123,9 @@ export function WidgetPreviewDemo({
       getMessagesSnapshot: () => messagesRef.current,
     }) as Action[];
 
-    return observer.wrap(baseActions);
+    const analyzedActions = analyzeDependencies(baseActions);
+
+    return observer.wrap(analyzedActions ?? baseActions);
   }, [widget]);
 
   const personaLookup = useMemo(

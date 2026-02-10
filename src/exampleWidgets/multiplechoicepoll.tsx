@@ -80,8 +80,8 @@ const voteSchema: ObjectSchema = {
   ],
 };
 
-const pollMsgtype = "examplepoll";
-const voteMsgtype = "examplevote";
+const pollMsgtype = "mcpoll";
+const voteMsgtype = "mcvote";
 
 
 function createActions({
@@ -139,37 +139,6 @@ function createActions({
             return previousActions.some(a => a.action === "createPoll" && a.input["poll"]?.[0]?.id === pollId);
           }
         },
-        {
-          name: "checkSameAuthorVote",
-          description: "Author has not voted on this poll yet",
-          validate: (previousActions, _nextActions, data) => {
-            const vote = data["vote"]?.[0];
-            if (!vote) {
-              return false;
-            }
-            const pollId = vote.properties["pollId"] as string;
-            const authorId = vote.properties["authorId"] as string;
-          
-            let hasVote = false;
-            for (let i = previousActions.length - 1; i >= 0; i--) {
-              const action = previousActions[i];
-              const actionPollId = action.input["vote"]?.[0]?.properties["pollId"];
-              const actionAuthorId = action.input["vote"]?.[0]?.properties["authorId"];
-              
-              if (actionPollId === pollId && actionAuthorId === authorId) {
-                if (action.action === "addVote") {
-                  hasVote = true;
-                  break;
-                } else if (action.action === "deleteVote") {
-                  hasVote = false;
-                  break;
-                }
-              }
-            }
-            
-            return !hasVote
-          }
-        }
       ],
       postConditions: [],
       inputDefinition: [
@@ -177,18 +146,6 @@ function createActions({
       ],
       execute: async (input: Record<string, ObjectInstance[]>) => {
         const vote = input.vote[0];
-        const alreadyVoted = getMessagesSnapshot().some(
-        (m) =>
-          m.type === voteMsgtype &&
-          m.custom &&
-          isOfSchema(m.custom, "vote") &&
-          m.custom.properties["pollId"] === vote.properties["pollId"] &&
-          m.authorId === vote.properties["authorId"]
-        );
-        if (alreadyVoted) {
-          console.log("Author has already voted on this poll.");
-          return;
-        }
   
         const voteMsg: Message = {
           id: `vote-${Date.now()}`,
@@ -373,32 +330,15 @@ function PollView({
       isOfSchema(m.custom, "vote") &&
       m.custom?.properties["pollId"] === poll.id
   );
-  const totalVotes = votes.length;
-  const myVote = votes.find((v) => v.authorId === currentActorId);
+  const myVote = votes.find(
+    (v) => v.authorId === currentActorId
+  );
+  const totalVotes = votes.length
 
   const handleVote = async (optionId: string) => {
     const addVoteAction = actions.find((a) => a.name === "addVote");
     const deleteVoteAction = actions.find((a) => a.name === "deleteVote");
     if (!addVoteAction || !deleteVoteAction) return;
-    if (!myVote) {
-      await addVoteAction.execute({
-        vote: [newObjectInstance(voteSchema, `vote-${Date.now()}`, {
-          optionId,
-          pollId: poll.id,
-          authorId: currentActorId,
-        })],
-      });
-      return;
-    }
-    if (myVote.custom.properties["optionId"] === optionId) {
-      await deleteVoteAction.execute({
-        vote: [myVote.custom],
-      });
-      return;
-    }
-    await deleteVoteAction.execute({
-      vote: [myVote.custom],
-    });
     await addVoteAction.execute({
       vote: [newObjectInstance(voteSchema, `vote-${Date.now()}`, {
         optionId,
@@ -598,9 +538,9 @@ if (
   document.head.appendChild(style);
 }
 
-export const examplepoll: ChatWidgetDefinition<Action[]> = {
+export const mcpoll: ChatWidgetDefinition<Action[]> = {
   type: pollMsgtype,
-  registryName: "examplepoll",
+  registryName: "mcpoll",
   elements: {
     render: (props) => <PollView {...props} />,
     composer: (props) => <PollComposer {...props} />,

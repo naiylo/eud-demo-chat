@@ -28,19 +28,27 @@ const pollSchema: ObjectSchema = {
       } 
     },
   ],
+  relationships: [],
 };
 
 const voteSchema: ObjectSchema = {
   name: "vote",
   properties: [
     { name: "authorId", type: "persona", array: false },
-    { name: "pollId", type: "reference", array: false, referenceSchema: "poll" },
     { name: "optionId", type: "id", array: false, linkedTo: "pollId.options" },
+  ],
+  relationships: [
+    {
+      cardinality: "N:1",
+      propertyName: "pollId",
+      targetSchema: "poll",
+      optional: false,
+    },
   ],
 };
 
-const pollMsgtype = "examplepoll";
-const voteMsgtype = "examplevote";
+const pollMsgtype = "brokenpoll";
+const voteMsgtype = "brokenvote";
 
 
 function createActions({
@@ -203,7 +211,6 @@ function createActions({
             m.type === voteMsgtype &&
             m.custom &&
             isOfSchema(m.custom, "vote") &&
-            m.custom.properties["pollId"] === vote.properties["pollId"] &&
             m.authorId === vote.properties["authorId"]
         );
         if (!votesToDelete.length) return;
@@ -215,7 +222,6 @@ function createActions({
                 m.type === voteMsgtype &&
                 m.custom &&
                 isOfSchema(m.custom, "vote") &&
-                m.custom.properties["pollId"] === vote.properties["pollId"] &&
                 m.authorId === vote.properties["authorId"]
               )
           )
@@ -557,9 +563,9 @@ if (
   document.head.appendChild(style);
 }
 
-export const examplepoll: ChatWidgetDefinition<Action[]> = {
+export const brokenpoll: ChatWidgetDefinition<Action[]> = {
   type: pollMsgtype,
-  registryName: "examplepoll",
+  registryName: "brokenpoll",
   elements: {
     render: (props) => <PollView {...props} />,
     composer: (props) => <PollComposer {...props} />,

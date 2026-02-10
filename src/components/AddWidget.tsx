@@ -11,11 +11,15 @@ import {
 import type { DemoActionImpact } from "../widgets/demoDiagnostics";
 import { WidgetPreviewDemo } from "./WidgetPreviewDemo";
 import type { Action } from "../generics/actions";
+import { isOfSchema } from "../generics/objects";
 
 const widgetGlobal = globalThis as typeof globalThis & {
   __widgetReact?: typeof React;
+  __isOfSchema?: typeof isOfSchema;
 };
+
 widgetGlobal.__widgetReact = React;
+widgetGlobal.__isOfSchema = isOfSchema;
 
 const stripWidgetImports = (source: string) =>
   source
@@ -34,6 +38,7 @@ const {
   useReducer,
   useContext,
 } = React;
+const isOfSchema = globalThis.__isOfSchema;
 `;
 
 let babelPromise: Promise<typeof import("@babel/standalone")> | null = null;
@@ -117,7 +122,7 @@ export function AddWidget() {
   const [activeHeuristicIds, setActiveHeuristicIds] = useState(() =>
     HEURISTIC_RULES.map((rule) => rule.id)
   );
-
+  
   const exportName = useMemo(() => {
     const match = code.match(/export const\s+(\w+)/);
     return match?.[1] ?? "customWidget";
@@ -215,7 +220,7 @@ export function AddWidget() {
         return;
       }
 
-      const streams = DEMO_STREAMS[widget.type] ?? [];
+      const streams = DEMO_STREAMS ?? [];
       const failingStreams: { id: string; label: string }[] = [];
 
       for (const stream of streams) {
@@ -309,8 +314,9 @@ export function AddWidget() {
   useEffect(() => {
     if (!code.trim() || diagnosticOpen) return;
     const interval = setInterval(() => {
+      if (code === lastCodeRef.current) return;
       void runDiagnostics();
-    }, 10000);
+    }, 1000);
     void runDiagnostics();
     return () => clearInterval(interval);
   }, [code, runDiagnostics, diagnosticOpen]);

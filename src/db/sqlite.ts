@@ -73,12 +73,21 @@ export async function getDB(): Promise<Database> {
   if (!count) {
     db.exec(`
       INSERT INTO personas (id,name,color,bio) VALUES
-        ('designer','Riley','#e86a92','Visual storyteller who cares about delightful interactions.'),
-        ('engineer','Noah','#0075ff','Systems thinker focused on stability and automation.'),
-        ('pm','Sasha','#00a676','Product strategist keeping the team aligned with users.');
+        ('designer','Lea','#e86a92','Law student, part-time designer, and full-time foodie.'),
+        ('engineer','Sebastian','#0075ff','Full-stack developer with a passion for grilling and outdoor cooking.'),
+        ('pm','Oskar','#00a676','Project manager who loves organizing BBQ events for friends and family.');
 
       INSERT INTO messages (id,authorId,text,timestamp,type,custom) VALUES
-        ('m1','designer','Hello world','2025-01-01T10:00:00.000Z','message',NULL);
+        ('m1','designer','Hi everyone! Could you please bring some steaks, sausages, burgers, salad, dips, bread, and drinks for tonight?','2025-01-01T10:00:00.000Z','message',NULL);
+
+      INSERT INTO messages (id,authorId,text,timestamp,type,custom) VALUES
+        ('m2','engineer','Sure. I will bring some steaks and burgers.','2025-01-01T10:01:00.000Z','message',NULL);
+
+      INSERT INTO messages (id,authorId,text,timestamp,type,custom) VALUES
+        ('m3','pm','Hi Lea! How are you doing? I think I will try to bring some drinks and maybe some salt sticks.','2025-01-01T10:02:00.000Z','message',NULL);
+
+      INSERT INTO messages (id,authorId,text,timestamp,type,custom) VALUES
+        ('m4','engineer','Whoops, sorry, I cant bring steaks and burgers, but I will bring some salad and dips instead.','2025-01-01T10:03:00.000Z','message',NULL);
     `);
     persist();
   }

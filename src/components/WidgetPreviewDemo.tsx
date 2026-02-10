@@ -13,6 +13,7 @@ import type {
   HeuristicFinding,
 } from "../widgets/demoDiagnostics";
 import type { Action } from "../generics/actions";
+import { analyzeDependencies } from "../generator/fuzzer";
 
 const summarizeTypes = (messages: Message[]) => {
   const counts = messages.reduce<Record<string, number>>((acc, msg) => {
@@ -72,10 +73,10 @@ export function WidgetPreviewDemo({
 
   const renderer = widget.elements?.render ?? (widget as any)?.render;
   const streamList = useMemo(() => {
-    const streams = DEMO_STREAMS[widget.type] ?? [];
+    const streams = DEMO_STREAMS ?? [];
     if (!streamFilter?.length) return streams;
     return streams.filter((stream) => streamFilter.includes(stream.id));
-  }, [widget.type, streamFilter]);
+  }, [streamFilter]);
   const activeStream = streamList[streamIndex];
   const isLastStream =
     streamList.length > 0 && streamIndex === streamList.length - 1;
@@ -122,7 +123,9 @@ export function WidgetPreviewDemo({
       getMessagesSnapshot: () => messagesRef.current,
     }) as Action[];
 
-    return observer.wrap(baseActions);
+    const analyzedActions = analyzeDependencies(baseActions);
+
+    return observer.wrap(analyzedActions ?? baseActions);
   }, [widget]);
 
   const personaLookup = useMemo(
@@ -591,18 +594,18 @@ export function WidgetPreviewDemo({
               <div>
                 <h3 className="analytics-label">Play demo</h3>
                 <p className="analytics-note">
-                  Accept keeps the current stream; Continue swaps in the next
-                  one until you reach the final stream.
+                  Continue swaps in the next
+                  stream until you reach the final stream.
                 </p>
               </div>
               <div className="analytics-nav">
-                <button
+                {/* <button
                   className="analytics-secondary"
                   onClick={handleAccept}
                   disabled={!activeStream}
                 >
                   Accept
-                </button>
+                </button> */}
                 <button
                   className="analytics-secondary"
                   onClick={handleContinue}
@@ -618,7 +621,7 @@ export function WidgetPreviewDemo({
               </div>
             </div>
 
-            <div className="analytics-panel analytics-panel--nav">
+            {/* <div className="analytics-panel analytics-panel--nav">
               <div>
                 <h3 className="analytics-label">Switch context</h3>
                 <p className="analytics-note">
@@ -640,7 +643,7 @@ export function WidgetPreviewDemo({
                   User demo view
                 </button>
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>

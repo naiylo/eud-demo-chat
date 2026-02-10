@@ -58,7 +58,7 @@ export function MessageBubble({
               minute: "2-digit",
             })}
           </time>
-          {onDelete && (
+          {/* {onDelete && (
             <button
               type="button"
               onClick={() => onDelete(message.id)}
@@ -67,7 +67,7 @@ export function MessageBubble({
             >
               Delete
             </button>
-          )}
+          )} */}
         </header>
         {renderContent}
       </div>

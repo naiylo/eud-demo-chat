@@ -28,22 +28,14 @@ const pollSchema: ObjectSchema = {
       } 
     },
   ],
-  relationships: [],
 };
 
 const voteSchema: ObjectSchema = {
   name: "vote",
   properties: [
     { name: "authorId", type: "persona", array: false },
+    { name: "pollId", type: "reference", array: false, referenceSchema: "poll" },
     { name: "optionId", type: "id", array: false, linkedTo: "pollId.options" },
-  ],
-  relationships: [
-    {
-      cardinality: "N:1",
-      propertyName: "pollId",
-      targetSchema: "poll",
-      optional: false,
-    },
   ],
 };
 

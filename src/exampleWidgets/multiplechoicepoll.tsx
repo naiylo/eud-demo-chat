@@ -11,39 +11,6 @@ import { isOfSchema, newObjectInstance, type ObjectInstance, type ObjectSchema }
 
 type PollOption = { id: string; label: string };
 
-// export interface PollCustom {
-//   prompt: string;
-//   options: PollOption[];
-// }
-
-// export interface VoteCustom {
-//   pollId: string;
-//   optionId: string;
-// }
-
-// const isPollCustom = (custom: unknown): custom is PollCustom =>
-//   !!custom &&
-//   typeof (custom as PollCustom).prompt === "string" &&
-//   Array.isArray((custom as PollCustom).options);
-
-// const isVoteCustom = (custom: unknown): custom is VoteCustom =>
-//   !!custom &&
-//   typeof (custom as VoteCustom).pollId === "string" &&
-//   typeof (custom as VoteCustom).optionId === "string";
-
-// type PollActions = {
-//   createPoll: (
-//     poll: Pick<PollCustom, "prompt" | "options">,
-//     authorId: string
-//   ) => Promise<void>;
-//   addVote: (
-//     pollId: string,
-//     optionId: string,
-//     authorId: string
-//   ) => Promise<void>;
-//   deleteVote: (pollId: string, authorId: string) => Promise<void>;
-// };
-
 const pollSchema: ObjectSchema = {
   name: "poll",
   properties: [
@@ -61,22 +28,14 @@ const pollSchema: ObjectSchema = {
       } 
     },
   ],
-  relationships: [],
 };
 
 const voteSchema: ObjectSchema = {
   name: "vote",
   properties: [
     { name: "authorId", type: "persona", array: false },
+    { name: "pollId", type: "reference", array: false, referenceSchema: "poll" },
     { name: "optionId", type: "id", array: false, linkedTo: "pollId.options" },
-  ],
-  relationships: [
-    {
-      cardinality: "N:1",
-      propertyName: "pollId",
-      targetSchema: "poll",
-      optional: false,
-    },
   ],
 };
 

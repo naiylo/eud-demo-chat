@@ -146,8 +146,13 @@ export function WidgetPreviewDemo({
   }, [actions]);
 
   const heuristicFindings = useMemo(
-    () => evaluateHeuristicFindings(actions, activeRuleIds),
-    [actions, activeRuleIds]
+    () =>
+      evaluateHeuristicFindings(
+        actions,
+        activeRuleIds,
+        widget.disabledHeuristicsByAction
+      ),
+    [actions, activeRuleIds, widget.disabledHeuristicsByAction]
   );
 
   const visibleHeuristicRules = useMemo(() => {

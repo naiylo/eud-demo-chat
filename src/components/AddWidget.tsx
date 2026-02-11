@@ -281,7 +281,11 @@ export function AddWidget() {
           return;
         }
 
-        const findings = evaluateHeuristicFindings(actions, activeHeuristicIds);
+        const findings = evaluateHeuristicFindings(
+          actions,
+          activeHeuristicIds,
+          widget.disabledHeuristicsByAction
+        );
         if (findings.length > 0) {
           const triggeredRules = Array.from(
             new Map(

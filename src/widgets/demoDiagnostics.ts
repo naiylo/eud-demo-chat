@@ -2,6 +2,7 @@ import type { Message, Persona } from "../db/sqlite";
 import { generateRandomFlow } from "../generator/fuzzer";
 import type { Action } from "../generics/actions";
 import type { ObjectSchema } from "../generics/objects";
+import type { HeuristicDisableMap } from "./types";
 
 export const PREVIEW_PERSONAS: Persona[] = [
   { id: "designer", name: "Oskar", color: "#e86a92", bio: "" },
@@ -171,27 +172,38 @@ export class DemoDatabaseObserver {
 
 export const evaluateHeuristicFindings = (
   actions: DemoActionImpact[],
-  activeRuleIds?: string[]
+  activeRuleIds?: string[],
+  disabledHeuristicsByAction?: HeuristicDisableMap
 ): HeuristicFinding[] => {
   const activeRuleSet = activeRuleIds
     ? new Set(activeRuleIds)
     : null;
 
-  return actions.flatMap((action) =>
-    HEURISTIC_RULES.filter((rule) =>
+  return actions.flatMap((action) => {
+    const disabledForAll = disabledHeuristicsByAction?.all ?? [];
+    const disabledForAction = disabledHeuristicsByAction?.[action.action] ?? [];
+    const disabledRuleSet =
+      disabledForAll.length || disabledForAction.length
+        ? new Set([...disabledForAll, ...disabledForAction])
+        : null;
+
+    return HEURISTIC_RULES.filter((rule) =>
       activeRuleSet ? activeRuleSet.has(rule.id) : true
-    ).map((rule) => {
-      const result = rule.evaluate(action);
-      if (!result.hit) return null;
-      return {
-        id: `${rule.id}-${action.id}`,
-        ruleId: rule.id,
-        label: rule.label,
-        severity: rule.severity,
-        detail: result.detail,
-        actionId: action.id,
-        actionOrder: action.order,
-      } as HeuristicFinding;
-    }).filter(Boolean) as HeuristicFinding[]
-  );
+    )
+      .filter((rule) => !(disabledRuleSet?.has(rule.id) ?? false))
+      .map((rule) => {
+        const result = rule.evaluate(action);
+        if (!result.hit) return null;
+        return {
+          id: `${rule.id}-${action.id}`,
+          ruleId: rule.id,
+          label: rule.label,
+          severity: rule.severity,
+          detail: result.detail,
+          actionId: action.id,
+          actionOrder: action.order,
+        } as HeuristicFinding;
+      })
+      .filter(Boolean) as HeuristicFinding[];
+  });
 };

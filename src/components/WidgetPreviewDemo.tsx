@@ -7,13 +7,14 @@ import {
   PREVIEW_PERSONAS,
   DemoDatabaseObserver,
   evaluateHeuristicFindings,
+  minimizeActionLog,
 } from "../widgets/demoDiagnostics";
 import type {
   DemoActionImpact,
   HeuristicFinding,
 } from "../widgets/demoDiagnostics";
-import type { Action } from "../generics/actions";
-import { analyzeDependencies } from "../generator/fuzzer";
+import type { Action, ActionLogEntry } from "../generics/actions";
+import { analyzeDependencies, replayActionLog } from "../generator/fuzzer";
 
 const summarizeTypes = (messages: Message[]) => {
   const counts = messages.reduce<Record<string, number>>((acc, msg) => {
@@ -43,11 +44,10 @@ const describeImpact = (action: DemoActionImpact) => {
 export function WidgetPreviewDemo({
   widget,
   onClose,
-  onOpenDatabaseView,
-  onOpenUserDemo,
   streamFilter,
   initialStreamId,
   activeRuleIds,
+  replayLogs,
 }: {
   widget: ChatWidgetDefinition;
   onClose: () => void;
@@ -59,6 +59,7 @@ export function WidgetPreviewDemo({
   streamFilter?: string[];
   initialStreamId?: string;
   activeRuleIds?: string[];
+  replayLogs?: Record<string, ActionLogEntry[]>;
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const messagesRef = useRef<Message[]>([]);
@@ -137,14 +138,6 @@ export function WidgetPreviewDemo({
     []
   );
 
-  const messageSourceMap = useMemo(() => {
-    const map = new Map<string, DemoActionImpact>();
-    actions.forEach((action) => {
-      action.added.forEach((msg) => map.set(msg.id, action));
-    });
-    return map;
-  }, [actions]);
-
   const heuristicFindings = useMemo(
     () =>
       evaluateHeuristicFindings(
@@ -155,6 +148,29 @@ export function WidgetPreviewDemo({
     [actions, activeRuleIds, widget.disabledHeuristicsByAction]
   );
 
+  const actionsForLog = useMemo(
+    () => minimizeActionLog(actions, heuristicFindings),
+    [actions, heuristicFindings]
+  );
+
+  const displayFindings = useMemo(
+    () =>
+      evaluateHeuristicFindings(
+        actionsForLog,
+        activeRuleIds,
+        widget.disabledHeuristicsByAction
+      ),
+    [actionsForLog, activeRuleIds, widget.disabledHeuristicsByAction]
+  );
+
+  const messageSourceMap = useMemo(() => {
+    const map = new Map<string, DemoActionImpact>();
+    actionsForLog.forEach((action) => {
+      action.added.forEach((msg) => map.set(msg.id, action));
+    });
+    return map;
+  }, [actionsForLog]);
+
   const visibleHeuristicRules = useMemo(() => {
     if (!activeRuleIds) return HEURISTIC_RULES;
     const activeRuleSet = new Set(activeRuleIds);
@@ -163,20 +179,20 @@ export function WidgetPreviewDemo({
 
   const heuristicsByAction = useMemo(() => {
     const map = new Map<string, HeuristicFinding[]>();
-    heuristicFindings.forEach((finding) => {
+    displayFindings.forEach((finding) => {
       const bucket = map.get(finding.actionId) ?? [];
       bucket.push(finding);
       map.set(finding.actionId, bucket);
     });
     return map;
-  }, [heuristicFindings]);
+  }, [displayFindings]);
 
   const totals = useMemo(
     () => ({
-      actions: actions.length,
-      added: actions.reduce((sum, action) => sum + action.added.length, 0),
-      removed: actions.reduce((sum, action) => sum + action.deleted.length, 0),
-      perAction: actions.reduce<
+      actions: actionsForLog.length,
+      added: actionsForLog.reduce((sum, action) => sum + action.added.length, 0),
+      removed: actionsForLog.reduce((sum, action) => sum + action.deleted.length, 0),
+      perAction: actionsForLog.reduce<
         Record<string, { count: number; adds: number; dels: number }>
       >((acc, action) => {
         const bucket = acc[action.action] ?? { count: 0, adds: 0, dels: 0 };
@@ -187,12 +203,26 @@ export function WidgetPreviewDemo({
         return acc;
       }, {}),
     }),
-    [actions]
+    [actionsForLog]
   );
 
+  const messagesForLog = useMemo(() => {
+    const ordered = [...actionsForLog].sort((left, right) => left.order - right.order);
+    const messageMap = new Map<string, Message>();
+    ordered.forEach((action) => {
+      action.deleted.forEach((msg) => {
+        messageMap.delete(msg.id);
+      });
+      action.added.forEach((msg) => {
+        messageMap.set(msg.id, msg);
+      });
+    });
+    return Array.from(messageMap.values());
+  }, [actionsForLog]);
+
   const visibleMessages = useMemo(
-    () => messages.filter((msg) => !(widget.hideMessage?.(msg) ?? false)),
-    [messages, widget]
+    () => messagesForLog.filter((msg) => !(widget.hideMessage?.(msg) ?? false)),
+    [messagesForLog, widget]
   );
 
   const canRunScript = Boolean(activeStream);
@@ -212,12 +242,19 @@ export function WidgetPreviewDemo({
       const wait = async (ms = 0) =>
         new Promise<void>((resolve) => setTimeout(resolve, ms));
       try {
-        await script({
-          actions: observedActions,
-          schemas: widget.schemas,
-          wait,
-          getMessages: () => messagesRef.current,
-        });
+        const replayLog = activeStream
+          ? replayLogs?.[activeStream.id]
+          : undefined;
+        if (replayLog && replayLog.length > 0) {
+          await replayActionLog(observedActions, replayLog);
+        } else {
+          await script({
+            actions: observedActions,
+            schemas: widget.schemas,
+            wait,
+            getMessages: () => messagesRef.current,
+          });
+        }
       } catch (err) {
         console.error("Demo script failed", err);
       }
@@ -225,7 +262,7 @@ export function WidgetPreviewDemo({
 
     isRunningRef.current = false;
     setIsRunning(false);
-  }, [activeStream, observedActions, widget.schemas]);
+  }, [activeStream, observedActions, widget.schemas, replayLogs]);
 
   useEffect(() => {
     if (!activeStream) return;
@@ -262,12 +299,6 @@ export function WidgetPreviewDemo({
     setActions([]);
   }, [widget.type, streamList, initialStreamId]);
 
-  const handleAccept = () => {
-    if (!activeStream) return;
-    setAcceptedStreamId(activeStream.id);
-    setSwitchNotice(null);
-  };
-
   const handleContinue = () => {
     if (!streamList.length || isLastStream) return;
     const nextIndex = streamIndex + 1;
@@ -279,14 +310,6 @@ export function WidgetPreviewDemo({
       })`
     );
     setAcceptedStreamId(null);
-  };
-
-  const handleOpenDatabaseView = () => {
-    onOpenDatabaseView?.({ messages, actions });
-  };
-
-  const handleOpenUserDemo = () => {
-    onOpenUserDemo?.();
   };
 
   const widgetDisplayName = widget.registryName ?? widget.type;
@@ -398,7 +421,7 @@ export function WidgetPreviewDemo({
                       >
                         {renderer({
                           message: msg,
-                          allMessages: messages,
+                          allMessages: messagesForLog,
                           personas: PREVIEW_PERSONAS,
                           currentActorId: msg.authorId,
                           actions: observedActions,
@@ -468,13 +491,13 @@ export function WidgetPreviewDemo({
               </div>
 
               <div className="heuristic-findings">
-                {heuristicFindings.length === 0 ? (
+                {displayFindings.length === 0 ? (
                   <p className="analytics-placeholder">
                     No anomalies flagged yet.
                   </p>
                 ) : (
                   <>
-                    {heuristicFindings.map((finding) => (
+                    {displayFindings.map((finding) => (
                       <div
                         key={finding.id}
                         className={`heuristic-finding heuristic-finding--${
@@ -518,14 +541,14 @@ export function WidgetPreviewDemo({
               )}
 
               <div className="timeline">
-                {actions.length === 0 && (
+                {actionsForLog.length === 0 && (
                   <p className="analytics-placeholder">
                     {isRunning
                       ? "Capturing timeline..."
                       : "Trace will populate here automatically."}
                   </p>
                 )}
-                {actions.map((action) => {
+                {actionsForLog.map((action) => {
                   const findings = heuristicsByAction.get(action.id) ?? [];
                   const visibleAdded = action.added.filter(
                     (m) => !(widget.hideMessage?.(m) ?? false)
@@ -604,13 +627,6 @@ export function WidgetPreviewDemo({
                 </p>
               </div>
               <div className="analytics-nav">
-                {/* <button
-                  className="analytics-secondary"
-                  onClick={handleAccept}
-                  disabled={!activeStream}
-                >
-                  Accept
-                </button> */}
                 <button
                   className="analytics-secondary"
                   onClick={handleContinue}
@@ -625,30 +641,6 @@ export function WidgetPreviewDemo({
                 </button>
               </div>
             </div>
-
-            {/* <div className="analytics-panel analytics-panel--nav">
-              <div>
-                <h3 className="analytics-label">Switch context</h3>
-                <p className="analytics-note">
-                  Navigate to the database or user-centric demo views to play
-                  the demo.
-                </p>
-              </div>
-              <div className="analytics-nav">
-                <button
-                  className="analytics-secondary"
-                  onClick={handleOpenDatabaseView}
-                >
-                  Database view
-                </button>
-                <button
-                  className="analytics-secondary"
-                  onClick={handleOpenUserDemo}
-                >
-                  User demo view
-                </button>
-              </div>
-            </div> */}
           </div>
         </div>
       </div>

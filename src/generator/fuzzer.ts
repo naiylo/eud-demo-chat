@@ -150,7 +150,7 @@ export function analyzeDependencies(actions: Action[]): Action[] | undefined {
 export async function generateRandomFlow(
     ctx: DemoScriptContext,
     personas: string[]
-): Promise<void> {
+): Promise<ActionLogEntry[]> {
     objects = {};
     const actions = ctx.actions as Action[];
     const rng = mulberry32(Math.floor(Math.random() * 1000000));
@@ -161,6 +161,19 @@ export async function generateRandomFlow(
         if (action) {
             await action.execute(entry.input);
         }
-        await ctx.wait(1);
+    }
+
+    return log;
+}
+
+export async function replayActionLog(
+    actions: Action[],
+    log: ActionLogEntry[]
+): Promise<void> {
+    for (const entry of log) {
+        const action = actions.find((a) => a.name === entry.action);
+        if (action) {
+            await action.execute(entry.input);
+        }
     }
 }

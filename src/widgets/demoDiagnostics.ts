@@ -1,7 +1,12 @@
 import type { Message, Persona } from "../db/sqlite";
 import { generateRandomFlow } from "../generator/fuzzer";
-import type { Action } from "../generics/actions";
-import type { ObjectSchema } from "../generics/objects";
+import type { Action, ActionLogEntry } from "../generics/actions";
+import {
+  isObjectInstance,
+  type ObjectInstance,
+  type ObjectSchema,
+  type PropertyDefinition,
+} from "../generics/objects";
 import type { HeuristicDisableMap } from "./types";
 
 export const PREVIEW_PERSONAS: Persona[] = [
@@ -50,7 +55,7 @@ export type DemoStream = {
   id: string;
   label: string;
   summary: string;
-  run: (context: DemoScriptContext) => Promise<void>;
+  run: (context: DemoScriptContext) => Promise<ActionLogEntry[] | void>;
 };
 
 export const HEURISTIC_RULES: HeuristicRule[] = [
@@ -106,14 +111,14 @@ export const HEURISTIC_RULES: HeuristicRule[] = [
 
 export const DEMO_STREAMS: DemoStream[] = [];
 
-for (let i = 0; i < 10; i++) {
+for (let i = 0; i < 100; i++) {
   DEMO_STREAMS.push({
     id: `random-stream-${i + 1}`,
     label: `Stream ${i + 1}`,
     summary: `Generates a randomized stream of actions for the widget.`,
     run: async (ctx) => {
       const personas = PREVIEW_PERSONAS.map((p) => p.id);
-      await generateRandomFlow(ctx, personas);
+      return await generateRandomFlow(ctx, personas);
     }
   });
 }
@@ -148,7 +153,6 @@ export class DemoDatabaseObserver {
       action.execute = async (input) => {
         const before = [...this.getSnapshot()];
         const result = await originalExecute.call(action, input);
-        await Promise.resolve();
         const after = [...this.getSnapshot()];
 
         const added = after.filter((a) => !before.some((b) => b.id === a.id));
@@ -206,4 +210,126 @@ export const evaluateHeuristicFindings = (
       })
       .filter(Boolean) as HeuristicFinding[];
   });
+};
+
+export const minimizeActionLog = (
+  actions: DemoActionImpact[],
+  findings: HeuristicFinding[]
+): DemoActionImpact[] => {
+  if (findings.length === 0) return actions;
+
+  const actionById = new Map(actions.map((action) => [action.id, action]));
+  const messageCreationMap = new Map<string, string>();
+  actions.forEach((action) => {
+    action.added.forEach((msg) => {
+      messageCreationMap.set(msg.id, action.id);
+    });
+  });
+  const selectedActionIds = new Set<string>();
+  const selectedRuleIds = new Set<string>();
+  const orderedFindings = [...findings].sort(
+    (left, right) => left.actionOrder - right.actionOrder
+  );
+
+  for (const finding of orderedFindings) {
+    if (selectedRuleIds.has(finding.ruleId)) continue;
+    const action = actionById.get(finding.actionId);
+    if (!action) continue;
+    selectedActionIds.add(action.id);
+    selectedRuleIds.add(finding.ruleId);
+  }
+
+  if (selectedActionIds.size === 0) return actions;
+
+  const collectReferencesFromProperty = (
+    propDef: PropertyDefinition,
+    value: unknown,
+    out: Set<string>
+  ) => {
+    if (value == null) return;
+    if (propDef.type === "reference") {
+      if (propDef.array && Array.isArray(value)) {
+        value.forEach((entry) => {
+          if (typeof entry === "string") out.add(entry);
+        });
+        return;
+      }
+      if (typeof value === "string") out.add(value);
+      return;
+    }
+    if (propDef.type === "object" && propDef.schema) {
+      if (propDef.array && Array.isArray(value)) {
+        value.forEach((entry) => {
+          if (entry && typeof entry === "object") {
+            Object.values(propDef.schema!).forEach((subProp) =>
+              collectReferencesFromProperty(
+                subProp,
+                (entry as Record<string, unknown>)[subProp.name],
+                out
+              )
+            );
+          }
+        });
+        return;
+      }
+      if (value && typeof value === "object") {
+        Object.values(propDef.schema).forEach((subProp) =>
+          collectReferencesFromProperty(
+            subProp,
+            (value as Record<string, unknown>)[subProp.name],
+            out
+          )
+        );
+      }
+    }
+  };
+
+  const collectReferencesFromInstance = (instance: ObjectInstance) => {
+    const refs = new Set<string>();
+    instance.schema.properties.forEach((propDef) => {
+      collectReferencesFromProperty(
+        propDef,
+        instance.properties[propDef.name],
+        refs
+      );
+    });
+    return refs;
+  };
+
+  const collectDependencyActionIds = (action: DemoActionImpact) => {
+    const deps = new Set<string>();
+    const inspectMessage = (message: Message) => {
+      if (!message.custom || !isObjectInstance(message.custom)) return;
+      const refs = collectReferencesFromInstance(message.custom);
+      refs.forEach((refId) => {
+        const creatorId = messageCreationMap.get(refId);
+        if (creatorId) deps.add(creatorId);
+      });
+    };
+
+    action.added.forEach(inspectMessage);
+    action.deleted.forEach((message) => {
+      const creatorId = messageCreationMap.get(message.id);
+      if (creatorId) deps.add(creatorId);
+      inspectMessage(message);
+    });
+
+    return deps;
+  };
+
+  const queue = Array.from(selectedActionIds);
+  while (queue.length > 0) {
+    const actionId = queue.shift();
+    if (!actionId) continue;
+    const action = actionById.get(actionId);
+    if (!action) continue;
+    const deps = collectDependencyActionIds(action);
+    deps.forEach((depId) => {
+      if (selectedActionIds.has(depId)) return;
+      selectedActionIds.add(depId);
+      queue.push(depId);
+    });
+  }
+
+  return actions.filter((action) => selectedActionIds.has(action.id));
 };

@@ -39,16 +39,15 @@ async function generateAction(
 ): Promise<ActionLogEntry> {
     const input: Record<string, ObjectInstance[]> = {};
     for (const def of action.inputDefinition) {
+        input[def.name] = [];
         if (def.uniqueInstance || !objects[def.schema.name] || objects[def.schema.name].length === 0)  {
             const amount = Math.floor(rng() * ((def.maxCount ?? 1) - (def.minCount ?? 0) + 1) + (def.minCount ?? 0));
-            input[def.name] = [];
             for (let i = 0; i < amount; i++) {
                 input[def.name].push(await createNextObjectInstance(def.schema, personas, rng));
             }
         } else {
             const existingCount = objects[def.schema.name].length;
             const amount = Math.floor(rng() * ((def.maxCount ?? existingCount) - (def.minCount ?? 0) + 1) + (def.minCount ?? 0));
-            input[def.name] = [];
             for (let i = 0; i < amount; i++) {
                 const objInstance = objects[def.schema.name][Math.floor(rng() * existingCount)];
                 input[def.name].push(objInstance);
@@ -77,6 +76,7 @@ async function randomLog(
         let result: ActionLogEntry | undefined = undefined;
         let attempts = 0;
         while (failedPreCondition || failedPostCondition) {
+            // attempts enforce that every action gets tried at least once before resorting to random selection
             const action = actions[(i + attempts) < actions.length ? (i + attempts) : Math.floor(rng() * actions.length)];
             const entry = await generateAction(action, personas, rng);
 

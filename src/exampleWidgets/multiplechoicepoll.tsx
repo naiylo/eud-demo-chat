@@ -156,12 +156,27 @@ function createActions({
           if (!vote) return false;
           const pollId = vote.properties["pollId"] as string;
           const authorId = vote.properties["authorId"] as string;
-          return previousActions.some(
-            (a) =>
-              a.action === "addVote" &&
-              a.input["vote"]?.[0]?.properties["pollId"] === pollId &&
-              a.input["vote"]?.[0]?.properties["authorId"] === authorId,
-          );
+          let hasVote = false;
+          for (let i = previousActions.length - 1; i >= 0; i--) {
+            const action = previousActions[i];
+            const actionPollId =
+              action.input["vote"]?.[0]?.properties["pollId"];
+            const actionAuthorId =
+              action.input["vote"]?.[0]?.properties["authorId"];
+
+            if (actionPollId === pollId && actionAuthorId === authorId) {
+              if (action.action === "addVote") {
+                hasVote = true;
+                break;
+              }
+              if (action.action === "deleteVote") {
+                hasVote = false;
+                break;
+              }
+            }
+          }
+
+          return hasVote;
         },
       },
     ],

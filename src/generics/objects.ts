@@ -153,3 +153,64 @@ export function randomObjectInstance(schema: ObjectSchema, id: string, personas:
     properties: properties,
   }
 }
+
+export function collectReferencesFromProperty(
+    propDef: PropertyDefinition,
+    value: unknown,
+    out: Set<string>,
+  ) {
+    if (value == null) 
+      return;
+
+    if (propDef.type === "reference") {
+      if (propDef.array && Array.isArray(value)) {
+        value.forEach((entry) => {
+          if (typeof entry === "string") 
+            out.add(entry);
+        });
+        return;
+      }
+
+      if (typeof value === "string") 
+        out.add(value);
+      return;
+    }
+    if (propDef.type === "object" && propDef.schema) {
+      if (propDef.array && Array.isArray(value)) {
+        value.forEach((entry) => {
+          if (entry && typeof entry === "object") {
+            Object.values(propDef.schema!).forEach((subProp) =>
+              collectReferencesFromProperty(
+                subProp,
+                (entry as Record<string, unknown>)[subProp.name],
+                out,
+              ),
+            );
+          }
+        });
+        return;
+      }
+      if (value && typeof value === "object") {
+        Object.values(propDef.schema).forEach((subProp) =>
+          collectReferencesFromProperty(
+            subProp,
+            (value as Record<string, unknown>)[subProp.name],
+            out,
+          ),
+        );
+      }
+    }
+  };
+
+export function collectReferencesFromInstance(instance: ObjectInstance) {
+    const refs = new Set<string>();
+    instance.schema.properties.forEach((propDef) => {
+      collectReferencesFromProperty(
+        propDef,
+        instance.properties[propDef.name],
+        refs,
+      );
+    });
+    return refs;
+  };
+

@@ -2,10 +2,9 @@ import type { Message, Persona } from "../db/sqlite";
 import { generateRandomFlow } from "../generator/fuzzer";
 import type { Action, ActionLogEntry } from "../generics/actions";
 import {
+  collectReferencesFromInstance,
   isObjectInstance,
-  type ObjectInstance,
   type ObjectSchema,
-  type PropertyDefinition,
 } from "../generics/objects";
 import type { HeuristicDisableMap } from "./types";
 
@@ -73,14 +72,14 @@ export const HEURISTIC_RULES: HeuristicRule[] = [
   },
   {
     id: "no-db-change",
-    label: "Action executed without DB change",
+    label: "Action executed without message stream change",
     severity: "warn",
     evaluate: (action) => ({
       hit:
         action.added.length === 0 &&
         action.deleted.length === 0 &&
         action.beforeCount === action.afterCount,
-      detail: "Action returned but did not persist a change to the database",
+      detail: "Action returned but did not persist a change to the message stream",
     }),
   },
   {
@@ -92,8 +91,21 @@ export const HEURISTIC_RULES: HeuristicRule[] = [
       return {
         hit:
           messagesCreated > 1 &&
-          new Set(action.added.map((m) => m.text)).size === 1,
+          new Set(action.added.map((m) => m.text + m.custom)).size === 1,
         detail: `Created ${messagesCreated} identical messages`,
+      };
+    },
+  },
+  {
+    id: "multiple-messages",
+    label: "Action created multiple messages",
+    severity: "warn",
+    evaluate: (action) => {
+      const messagesCreated = action.added.length;
+      return {
+        hit:
+          messagesCreated > 1,
+        detail: `Created ${messagesCreated} messages`,
       };
     },
   },
@@ -102,11 +114,22 @@ export const HEURISTIC_RULES: HeuristicRule[] = [
     label: "Action created empty message(s)",
     severity: "weird",
     evaluate: (action) => {
-      const messagesCreated = action.added.length;
+      const messagesCreated = action.added.filter((m) => m.text.trim() === "").length;
       return {
-        hit:
-          messagesCreated > 0 && action.added.some((m) => m.text.trim() === ""),
+        hit: messagesCreated > 0,
         detail: `Created ${messagesCreated} empty message(s)`,
+      };
+    },
+  },
+  {
+    id: "empty-custom-section",
+    label: "Action created empty custom section",
+    severity: "weird",
+    evaluate: (action) => {
+      const messagesCreated = action.added.filter((m) => !m.custom).length;
+      return {
+        hit: messagesCreated > 0,
+        detail: `Created ${messagesCreated} empty custom section(s)`,
       };
     },
   },
@@ -217,7 +240,8 @@ export const minimizeActionLog = (
   actions: DemoActionImpact[],
   findings: HeuristicFinding[],
 ): DemoActionImpact[] => {
-  if (findings.length === 0) return actions;
+  if (findings.length === 0) 
+    return actions;
 
   const actionById = new Map(actions.map((action) => [action.id, action]));
   const messageCreationMap = new Map<string, string>();
@@ -233,85 +257,42 @@ export const minimizeActionLog = (
   );
 
   for (const finding of orderedFindings) {
-    if (selectedRuleIds.has(finding.ruleId)) continue;
+    if (selectedRuleIds.has(finding.ruleId)) 
+      continue;
+
     const action = actionById.get(finding.actionId);
-    if (!action) continue;
+    if (!action) 
+      continue;
+
     selectedActionIds.add(action.id);
     selectedRuleIds.add(finding.ruleId);
   }
 
-  if (selectedActionIds.size === 0) return actions;
-
-  const collectReferencesFromProperty = (
-    propDef: PropertyDefinition,
-    value: unknown,
-    out: Set<string>,
-  ) => {
-    if (value == null) return;
-    if (propDef.type === "reference") {
-      if (propDef.array && Array.isArray(value)) {
-        value.forEach((entry) => {
-          if (typeof entry === "string") out.add(entry);
-        });
-        return;
-      }
-      if (typeof value === "string") out.add(value);
-      return;
-    }
-    if (propDef.type === "object" && propDef.schema) {
-      if (propDef.array && Array.isArray(value)) {
-        value.forEach((entry) => {
-          if (entry && typeof entry === "object") {
-            Object.values(propDef.schema!).forEach((subProp) =>
-              collectReferencesFromProperty(
-                subProp,
-                (entry as Record<string, unknown>)[subProp.name],
-                out,
-              ),
-            );
-          }
-        });
-        return;
-      }
-      if (value && typeof value === "object") {
-        Object.values(propDef.schema).forEach((subProp) =>
-          collectReferencesFromProperty(
-            subProp,
-            (value as Record<string, unknown>)[subProp.name],
-            out,
-          ),
-        );
-      }
-    }
-  };
-
-  const collectReferencesFromInstance = (instance: ObjectInstance) => {
-    const refs = new Set<string>();
-    instance.schema.properties.forEach((propDef) => {
-      collectReferencesFromProperty(
-        propDef,
-        instance.properties[propDef.name],
-        refs,
-      );
-    });
-    return refs;
-  };
+  if (selectedActionIds.size === 0) 
+    return actions;
 
   const collectDependencyActionIds = (action: DemoActionImpact) => {
     const deps = new Set<string>();
+
     const inspectMessage = (message: Message) => {
-      if (!message.custom || !isObjectInstance(message.custom)) return;
+      if (!message.custom || !isObjectInstance(message.custom)) 
+        return;
+
       const refs = collectReferencesFromInstance(message.custom);
+
       refs.forEach((refId) => {
         const creatorId = messageCreationMap.get(refId);
-        if (creatorId) deps.add(creatorId);
+        if (creatorId)
+          deps.add(creatorId);
       });
     };
 
     action.added.forEach(inspectMessage);
     action.deleted.forEach((message) => {
       const creatorId = messageCreationMap.get(message.id);
-      if (creatorId) deps.add(creatorId);
+      if (creatorId) 
+        deps.add(creatorId);
+
       inspectMessage(message);
     });
 
@@ -321,12 +302,18 @@ export const minimizeActionLog = (
   const queue = Array.from(selectedActionIds);
   while (queue.length > 0) {
     const actionId = queue.shift();
-    if (!actionId) continue;
+    if (!actionId) 
+      continue;
+
     const action = actionById.get(actionId);
-    if (!action) continue;
+    if (!action) 
+      continue;
+
     const deps = collectDependencyActionIds(action);
     deps.forEach((depId) => {
-      if (selectedActionIds.has(depId)) return;
+      if (selectedActionIds.has(depId))
+        return;
+
       selectedActionIds.add(depId);
       queue.push(depId);
     });

@@ -46,7 +46,7 @@ export type HeuristicFinding = {
 
 export type DemoScriptContext = {
   actions: Action[];
-  schemas: ObjectSchema[],
+  schemas: ObjectSchema[];
   wait: (ms: number) => Promise<void>;
   getMessages: () => Message[];
 };
@@ -90,7 +90,9 @@ export const HEURISTIC_RULES: HeuristicRule[] = [
     evaluate: (action) => {
       const messagesCreated = action.added.length;
       return {
-        hit: messagesCreated > 1 && new Set(action.added.map((m) => m.text)).size === 1,
+        hit:
+          messagesCreated > 1 &&
+          new Set(action.added.map((m) => m.text)).size === 1,
         detail: `Created ${messagesCreated} identical messages`,
       };
     },
@@ -102,7 +104,8 @@ export const HEURISTIC_RULES: HeuristicRule[] = [
     evaluate: (action) => {
       const messagesCreated = action.added.length;
       return {
-        hit: messagesCreated > 0 && action.added.some((m) => m.text.trim() === ""),
+        hit:
+          messagesCreated > 0 && action.added.some((m) => m.text.trim() === ""),
         detail: `Created ${messagesCreated} empty message(s)`,
       };
     },
@@ -119,7 +122,7 @@ for (let i = 0; i < 100; i++) {
     run: async (ctx) => {
       const personas = PREVIEW_PERSONAS.map((p) => p.id);
       return await generateRandomFlow(ctx, personas);
-    }
+    },
   });
 }
 
@@ -141,7 +144,7 @@ export class DemoDatabaseObserver {
       deleted: Message[];
       beforeCount: number;
       afterCount: number;
-    }) => void
+    }) => void,
   ) {
     this.getSnapshot = getSnapshot;
     this.onChange = onChange;
@@ -177,11 +180,9 @@ export class DemoDatabaseObserver {
 export const evaluateHeuristicFindings = (
   actions: DemoActionImpact[],
   activeRuleIds?: string[],
-  disabledHeuristicsByAction?: HeuristicDisableMap
+  disabledHeuristicsByAction?: HeuristicDisableMap,
 ): HeuristicFinding[] => {
-  const activeRuleSet = activeRuleIds
-    ? new Set(activeRuleIds)
-    : null;
+  const activeRuleSet = activeRuleIds ? new Set(activeRuleIds) : null;
 
   return actions.flatMap((action) => {
     const disabledForAll = disabledHeuristicsByAction?.all ?? [];
@@ -192,7 +193,7 @@ export const evaluateHeuristicFindings = (
         : null;
 
     return HEURISTIC_RULES.filter((rule) =>
-      activeRuleSet ? activeRuleSet.has(rule.id) : true
+      activeRuleSet ? activeRuleSet.has(rule.id) : true,
     )
       .filter((rule) => !(disabledRuleSet?.has(rule.id) ?? false))
       .map((rule) => {
@@ -214,7 +215,7 @@ export const evaluateHeuristicFindings = (
 
 export const minimizeActionLog = (
   actions: DemoActionImpact[],
-  findings: HeuristicFinding[]
+  findings: HeuristicFinding[],
 ): DemoActionImpact[] => {
   if (findings.length === 0) return actions;
 
@@ -228,7 +229,7 @@ export const minimizeActionLog = (
   const selectedActionIds = new Set<string>();
   const selectedRuleIds = new Set<string>();
   const orderedFindings = [...findings].sort(
-    (left, right) => left.actionOrder - right.actionOrder
+    (left, right) => left.actionOrder - right.actionOrder,
   );
 
   for (const finding of orderedFindings) {
@@ -244,7 +245,7 @@ export const minimizeActionLog = (
   const collectReferencesFromProperty = (
     propDef: PropertyDefinition,
     value: unknown,
-    out: Set<string>
+    out: Set<string>,
   ) => {
     if (value == null) return;
     if (propDef.type === "reference") {
@@ -265,8 +266,8 @@ export const minimizeActionLog = (
               collectReferencesFromProperty(
                 subProp,
                 (entry as Record<string, unknown>)[subProp.name],
-                out
-              )
+                out,
+              ),
             );
           }
         });
@@ -277,8 +278,8 @@ export const minimizeActionLog = (
           collectReferencesFromProperty(
             subProp,
             (value as Record<string, unknown>)[subProp.name],
-            out
-          )
+            out,
+          ),
         );
       }
     }
@@ -290,7 +291,7 @@ export const minimizeActionLog = (
       collectReferencesFromProperty(
         propDef,
         instance.properties[propDef.name],
-        refs
+        refs,
       );
     });
     return refs;

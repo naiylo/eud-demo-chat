@@ -11,15 +11,15 @@ Quick links:
 
 ### Context
 
-Messaging platforms have become central to everyday coordination and collaboration. Some platform providers are beginning to explore ways of empowering their userbases to create their own widgets, seeing this as a promising way to make the platform more engaging while enriching the overall platform experience. As end-user development tools and large language models lower the barrier to creating such widgets, non-technical users gain the ability to build interactive functionality without programming expertise. This shift levels the playing field for software creation but introduces significant new challenges.
+Software systems are rarely static they evolve continuously, and every change carries the risk of unintended consequences. Change impact analysis, the process of identifying how a modification to one part of a system affects its broader behavior, is a well-established concern in software engineering. This challenge becomes particularly acute in the context of end-user development, where non-technical users create and modify code without the testing infrastructure or debugging knowledge that professional developers rely on. As end-user development tools and large language models lower the barrier to software creation, understanding and communicating the behavioral impact of code changes becomes essential. We explore this challenge in the context of user-created widgets for messaging platforms, where non-technical users build and iteratively modify interactive functionality that directly manipulates shared message streams making undetected behavioral regressions particularly consequential.
 
 ### Inquiry
 
-When non-programmers create widgets for messaging platforms, they face three core problems: they struggle to anticipate edge cases in their widget's behavior, they have limited ability to understand and debug errors when things go wrong, and they face uncertainty about how their widget will behave at runtime across different usage scenarios. Prior approaches to behavior analysis such as symbolic execution or LLM-based code inspection either prove too complex to apply efficiently to widget code or risk hallucinating incorrect results.
+When non-programmers create widgets for messaging platforms, they face three core problems: they struggle to anticipate edge cases in their widget's behavior, they have limited ability to understand and debug errors when things go wrong, and they face uncertainty about how their widget will behave at runtime across different usage scenarios. Prior approaches to change impact analysis such as symbolic execution or LLM-based code inspection either prove too complex to apply efficiently or risk producing hallucinated results.
 
 ### Approach
 
-We developed a system that simulates widget behavior through fuzzing combined with heuristic-based validation. The fuzzer automatically generates randomized but semantically valid sequences of action calls by analyzing the widget's data model and the dependencies between message types. These generated action logs are then passed through a heuristic checker that inspects message stream changes produced by each action, flagging behaviors that indicate likely defects such as an action deleting multiple messages at once, or producing duplicate messages.
+We developed a system that automatically detects and communicates the behavioral impact of widget changes through fuzzing combined with heuristic-based validation. Upon each code change, a fuzzer generates randomized but semantically valid sequences of action calls by analyzing the widget's data model and the dependencies between message types. These generated action logs are passed through a heuristic checker that inspects message stream changes produced by each action, flagging behaviors that indicate likely defects such as an action deleting multiple messages at once, or producing duplicate messages.
 
 ### Knowledge
 
@@ -40,8 +40,6 @@ Future improvements could include:
 - Add labeling to individual functions that automatically load a partion fo the heuritics, giving the user a push into the right direction in terms of what heuritics may be be relevant for the certain action
 - Adaptive context-aware heuristics
 - Creating meta principles to for heuristic derivation out of data types
-
-Potential impr
 
 ## TL;DR
 

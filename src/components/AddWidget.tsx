@@ -1,3 +1,7 @@
+/**
+ * Workbench editor for pasting widget code, saving it, and running diagnostics.
+ * Shows heuristic toggles and opens the preview modal for failing demo streams.
+ */
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Message } from "../db/sqlite";
@@ -10,7 +14,7 @@ import {
 } from "../widgets/demoDiagnostics";
 import type { DemoActionImpact } from "../widgets/demoDiagnostics";
 import { WidgetPreviewDemo } from "./WidgetPreviewDemo";
-import type { Action } from "../generics/actions";
+import type { Action, ActionLogEntry } from "../generics/actions";
 import { isOfSchema } from "../generics/objects";
 
 const widgetGlobal = globalThis as typeof globalThis & {
@@ -112,6 +116,9 @@ export function AddWidget() {
   const [diagnosticStreams, setDiagnosticStreams] = useState<
     { id: string; label: string }[]
   >([]);
+  const [diagnosticLogs, setDiagnosticLogs] = useState<
+    Record<string, ActionLogEntry[]>
+  >({});
   const [diagnosticInitialStreamId, setDiagnosticInitialStreamId] = useState<
     string | null
   >(null);
@@ -216,12 +223,14 @@ export function AddWidget() {
         if (diagnosticRunRef.current !== runId) return;
         setDiagnosticWidget(null);
         setDiagnosticStreams([]);
+        setDiagnosticLogs({});
         setDiagnosticInitialStreamId(null);
         return;
       }
 
       const streams = DEMO_STREAMS ?? [];
       const failingStreams: { id: string; label: string }[] = [];
+      const streamLogs: Record<string, ActionLogEntry[]> = {};
 
       for (const stream of streams) {
         const actions: DemoActionImpact[] = [];
@@ -270,18 +279,24 @@ export function AddWidget() {
         const wait = async (ms = 0) =>
           new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+        let streamLog: ActionLogEntry[] | undefined;
         try {
-          await stream.run({
+          const result = await stream.run({
             actions: observedActions,
             schemas: widget.schemas,
             wait,
             getMessages: () => messages,
           });
-        } catch (err) {
+          streamLog = Array.isArray(result) ? result : undefined;
+        } catch {
           return;
         }
 
-        const findings = evaluateHeuristicFindings(actions, activeHeuristicIds);
+        const findings = evaluateHeuristicFindings(
+          actions,
+          activeHeuristicIds,
+          widget.disabledHeuristicsByAction
+        );
         if (findings.length > 0) {
           const triggeredRules = Array.from(
             new Map(
@@ -295,6 +310,9 @@ export function AddWidget() {
             triggeredRules
           );
           failingStreams.push({ id: stream.id, label: stream.label });
+          if (streamLog) {
+            streamLogs[stream.id] = streamLog;
+          }
         }
       }
 
@@ -303,8 +321,9 @@ export function AddWidget() {
 
       setDiagnosticWidget(widget);
       setDiagnosticStreams(failingStreams);
+      setDiagnosticLogs(streamLogs);
       setDiagnosticInitialStreamId(failingStreams[0]?.id ?? null);
-    } catch (err) {
+    } catch {
       return;
     } finally {
       diagnosticInFlightRef.current = false;
@@ -430,6 +449,7 @@ export function AddWidget() {
           streamFilter={diagnosticStreamIds}
           initialStreamId={diagnosticInitialStreamId ?? undefined}
           activeRuleIds={activeHeuristicIds}
+          replayLogs={diagnosticLogs}
         />
       )}
     </>

@@ -1,3 +1,7 @@
+/**
+ * Simple launcher for opening the diagnostic preview on a selected widget.
+ * Uses registry name/type lookup for quick testing.
+ */
 import { useEffect, useMemo, useState } from "react";
 import type { ChatWidgetDefinition } from "../widgets/types";
 import { WidgetPreviewDemo } from "./WidgetPreviewDemo";

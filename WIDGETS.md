@@ -1,71 +1,212 @@
-# Widgets: How to add a new one
+# Widget Authoring Guide
 
-The chat supports pluggable widgets. Each widget lives in **one file** under `src/widgets/` and registers itself through `src/widgets/registry.ts`. Think of a widget as a tiny class with clearly separated elements:
-- Its message type(s) and custom payload interfaces
-- Its create/toggle/send actions
-- Its `elements.render` (how a row is painted)
-- Its optional `elements.composer` (UI shown in the workbench)
-- Its own injected styles (keeps global CSS clean)
+This document explains how to structure a widget in this project and how to add one safely.
 
-## Quick steps
-1) Create `src/widgets/<yourWidget>.tsx` that exports a `ChatWidgetDefinition` with an `elements` block.
-2) Add the widget to `widgetRegistry` in `src/widgets/registry.ts`.
-3) Done. The app will render your widget messages, hide any helper/system messages you mark, and expose your composer in the workbench.
+## 1. Widget Contract
 
-## Widget file template
+Every widget must export a `ChatWidgetDefinition`.
+
 ```ts
-import { useState } from "react";
-import type { Message, Persona } from "../db/sqlite";
-import type { ChatWidgetDefinition, WidgetActionDeps, WidgetRenderProps, WidgetComposerProps } from "./types";
+import type { ChatWidgetDefinition } from "./types";
+import type { Action } from "../generics/actions";
 
-// 1) Define custom payloads owned by the widget
-export interface MyCustom { /* ... */ }
-
-// 2) (Optional) Type guards for safety when reading message.custom
-function isMyCustom(x: unknown): x is MyCustom { /* ... */ }
-
-// 3) Actions (createActions) get DB/state helpers via deps
-type MyActions = { /* functions you need in render/composer */ };
-function createActions({ addMessage, deleteMessage, setMessages, getMessagesSnapshot }: WidgetActionDeps): MyActions {
-  // build and return your widget-specific actions
-}
-
-// 4) Composer: optional UI shown in the workbench tab for this widget
-function MyComposer({ actions, authorId, onClose }: WidgetComposerProps<MyActions>) { /* ... */ }
-
-// 5) Render: how a message of this widget type is displayed
-function MyView(props: WidgetRenderProps<MyActions>) { /* ... */ }
-
-// 6) Export the definition with elements
-export const myWidget: ChatWidgetDefinition<MyActions> = {
-  type: "<yourMessageType>",
-  createActions,
+export const myWidget: ChatWidgetDefinition<Action[]> = {
+  type: "my-widget-type",
+  registryName: "myWidget",
   elements: {
-    render: (props) => <MyView {...props} />,
-    composer: (props) => <MyComposer {...props} />, // optional
+    render: (props) => {
+      /* render one message */
+    },
+    composer: (props) => {
+      /* optional UI to create messages */
+    },
   },
-  hideMessage: (message) => /* return true for helper/system rows to hide */,
-  registryName: "<optional-registry-name>",
+  schemas: [],
+  createActions: (deps) => [
+    /* Action objects */
+  ],
+};
+```
+
+Fields:
+
+- `type`: message type this widget renders.
+- `registryName` (optional): stable name used by workbench/demo lookup.
+- `elements.render`: renderer for one message row.
+- `elements.composer` (optional): UI shown in Widget Workbench.
+- `schemas`: object schemas used by the widget and fuzzer.
+- `createActions`: returns runtime actions that mutate messages.
+- `hideMessage` (optional): suppress specific message types from main chat view.
+- `disabledHeuristicsByAction` (optional): disable selected diagnostic heuristics.
+
+## 2. Recommended File Structure
+
+For one widget, keep everything in one file:
+
+1. Imports.
+2. Object schema definitions.
+3. `createActions` function.
+4. `Render` component.
+5. Optional `Composer` component.
+6. Exported widget definition.
+
+Suggested location: `src/widgets/<widgetName>.tsx`.
+
+## 3. Example: Normal Text Widget
+
+The example below creates plain text messages with a small composer.
+
+```tsx
+import { useState } from "react";
+import type { Message } from "../db/sqlite";
+import type { Action } from "../generics/actions";
+import {
+  isOfSchema,
+  newObjectInstance,
+  type ObjectInstance,
+  type ObjectSchema,
+} from "../generics/objects";
+import type {
+  ChatWidgetDefinition,
+  WidgetActionDeps,
+  WidgetComposerProps,
+  WidgetRenderProps,
+} from "./types";
+
+const textMessageSchema: ObjectSchema = {
+  name: "textMessage",
+  properties: [
+    { name: "text", type: "string", array: false, minLength: 1 },
+    { name: "authorId", type: "persona", array: false },
+  ],
 };
 
-// 7) (Optional) Inject styles so the widget is self-contained
-const myStyles = `...css...`;
-if (typeof document !== "undefined" && !document.getElementById("my-widget-styles")) {
-  const tag = document.createElement("style");
-  tag.id = "my-widget-styles";
-  tag.textContent = myStyles;
-  document.head.appendChild(tag);
+const textMessageType = "text-message";
+
+function createActions({
+  addMessage,
+  setMessages,
+}: WidgetActionDeps): Action[] {
+  const sendText: Action = {
+    name: "sendText",
+    description: "Create a plain text message",
+    preConditions: [],
+    postConditions: [],
+    inputDefinition: [
+      {
+        name: "entry",
+        schema: textMessageSchema,
+        minCount: 1,
+        maxCount: 1,
+        uniqueInstance: true,
+      },
+    ],
+    execute: async (input) => {
+      const entry = input.entry?.[0];
+      if (!entry) return;
+
+      const text = String(entry.properties["text"] ?? "").trim();
+      const authorId = String(entry.properties["authorId"] ?? "");
+      if (!text || !authorId) return;
+
+      const msg: Message = {
+        id: entry.id,
+        authorId,
+        text,
+        timestamp: new Date().toISOString(),
+        type: textMessageType,
+        custom: entry,
+      };
+
+      await addMessage(msg);
+      setMessages((cur) => [...cur, msg]);
+    },
+  };
+
+  return [sendText];
 }
+
+function TextComposer({
+  actions,
+  author,
+  onClose,
+}: WidgetComposerProps<Action[]>) {
+  const [text, setText] = useState("");
+
+  const send = async () => {
+    const value = text.trim();
+    if (!value) return;
+
+    const action = actions.find((a) => a.name === "sendText");
+    if (!action) return;
+
+    await action.execute({
+      entry: [
+        newObjectInstance(textMessageSchema, `text-${Date.now()}`, {
+          text: value,
+          authorId: author.id,
+        }),
+      ],
+    });
+
+    setText("");
+    onClose();
+  };
+
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      <input
+        placeholder="Write a message"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+      />
+      <button type="button" onClick={send} disabled={!text.trim()}>
+        Send text
+      </button>
+    </div>
+  );
+}
+
+function TextRender({ message }: WidgetRenderProps<Action[]>) {
+  if (!message.custom || !isOfSchema(message.custom, "textMessage")) {
+    return <p>{message.text}</p>;
+  }
+
+  const entry = message.custom as ObjectInstance;
+  return <p>{String(entry.properties["text"] ?? "")}</p>;
+}
+
+export const textMessageWidget: ChatWidgetDefinition<Action[]> = {
+  type: textMessageType,
+  registryName: "textMessageWidget",
+  elements: {
+    render: (props) => <TextRender {...props} />,
+    composer: (props) => <TextComposer {...props} />,
+  },
+  schemas: [textMessageSchema],
+  createActions,
+};
 ```
 
-### Registry
+## 4. Register the Widget manually
+
+Add the widget import and entry in `src/widgets/registry.ts`.
+
 ```ts
-// src/widgets/registry.ts
-import { myWidget } from "./myWidget";
-export const widgetRegistry = [myWidget /*, other widgets */];
+import type { AnyWidgetDefinition } from "./types";
+import { textMessageWidget } from "./textMessageWidget";
+
+export const widgetRegistry: AnyWidgetDefinition[] = [textMessageWidget];
 ```
 
-### Notes
-- `MessageType` in the DB is open (`"message" | string`), so widgets can introduce new types without touching the DB schema.
-- If your widget emits helper/system messages (like votes or updates), use `hideMessage` to keep them out of the main stream.
-- Keep all widget styling in the widget file to avoid leaking CSS across widgets.
+## 5. Add Widgets Through the Workbench
+
+Alternative flow (no manual registry edit):
+
+1. Start dev server (`npm run dev`).
+2. Open Widget Workbench.
+3. Paste a full widget file into Add Widget.
+4. Ensure it uses `export const <Name>`.
+5. Submit.
+
+The Vite dev middleware saves `src/widgets/<Name>.tsx` and updates `src/widgets/registry.ts` automatically.

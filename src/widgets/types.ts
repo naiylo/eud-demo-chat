@@ -34,12 +34,17 @@ export type WidgetElements<TActions> = {
   composer?: (props: WidgetComposerProps<TActions>) => ReactNode;
 };
 
+/** Map of Action.name (or "all") to heuristic rule ids to disable. */
+export type HeuristicDisableMap = Record<string, string[]>;
+
 export interface ChatWidgetDefinition<TActions = unknown> {
   type: MessageType;
   elements: WidgetElements<TActions>;
   schemas: ObjectSchema[];
   createActions: (deps: WidgetActionDeps) => TActions;
   hideMessage?: (message: Message) => boolean;
+  /** Optional: per-action (Action.name) list of heuristic rule ids to skip in diagnostics. Use "all" to apply to every action. */
+  disabledHeuristicsByAction?: HeuristicDisableMap;
   /** Optional: name used in registry/file management */
   registryName?: string;
 }

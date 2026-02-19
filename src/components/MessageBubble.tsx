@@ -6,7 +6,6 @@ export function MessageBubble({
   persona,
   personas,
   currentActorId,
-  onDelete,
   allMessages,
   widgets,
   widgetActions,

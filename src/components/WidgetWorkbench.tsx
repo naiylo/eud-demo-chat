@@ -27,7 +27,7 @@ export function WidgetWorkbench({
     composerWidgets[0]?.type ??
     ADD_WIDGET_KEY;
   const [mode, setMode] = useState<string>(defaultKey);
-  const [removeNotice, setRemoveNotice] = useState<string>("");
+  const [, setRemoveNotice] = useState<string>("");
 
   if (!open) return null;
 

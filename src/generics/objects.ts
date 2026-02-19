@@ -135,7 +135,7 @@ export function randomObjectInstance(schema: ObjectSchema, id: string, personas:
 
             const finalReferences: string[] = [];
             while (randomLength > 0) {
-              finalReferences.push(propValue instanceof Array ? propValue[Math.floor(rng() * propValue.length)].id : propValue.id);
+              finalReferences.push(propValue instanceof Array ? propValue[Math.floor(rng() * propValue.length)].id : (propValue as { id: string }).id);
               randomLength--;
             }
             properties[propDef.name] = propDef.array ? finalReferences : finalReferences![0];

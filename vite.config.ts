@@ -188,5 +188,9 @@ const widgetWriter = {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), widgetWriter],
+  server: {
+        host: true,
+        port: 8080
+      },
   base: "/eud-demo-chat/",
 });

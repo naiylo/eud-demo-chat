@@ -1,3 +1,7 @@
+/**
+ * Workbench editor for pasting widget code, saving it, and running diagnostics.
+ * Shows heuristic toggles and opens the preview modal for failing demo streams.
+ */
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Message } from "../db/sqlite";

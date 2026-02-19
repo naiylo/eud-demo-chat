@@ -1,3 +1,7 @@
+/**
+ * Renders one message row.
+ * Falls back to plain text when no widget renderer matches the message type.
+ */
 import type { Persona, Message } from "../db/sqlite";
 import type { ChatWidgetDefinition, WidgetActionMap } from "../widgets/types";
 

@@ -1,3 +1,7 @@
+/**
+ * Modal JSON inspector for current app state (personas/messages).
+ * Closes on overlay click or Escape.
+ */
 import { useEffect, useMemo } from "react";
 
 export function DataPanel({

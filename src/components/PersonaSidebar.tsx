@@ -1,3 +1,7 @@
+/**
+ * Sidebar for selecting the active persona and opening the widget workbench.
+ * Passes widget registry/actions through to workbench tools.
+ */
 import { useState } from "react";
 import type { Persona } from "../db/sqlite";
 import { WidgetWorkbench } from "./WidgetWorkbench";

@@ -1,3 +1,7 @@
+/**
+ * Main conversation surface with header actions and the message timeline.
+ * Delegates message rendering to widgets via MessageList.
+ */
 import type { Persona, Message } from "../db/sqlite";
 import { MessageList } from "./MessageList";
 import type { ChatWidgetDefinition, WidgetActionMap } from "../widgets/types";

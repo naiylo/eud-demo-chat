@@ -1,3 +1,7 @@
+/**
+ * Diagnostic replay modal for widgets.
+ * Replays demo streams, shows action impacts, and highlights heuristic findings.
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Message, Persona } from "../db/sqlite";
 import type { ChatWidgetDefinition } from "../widgets/types";

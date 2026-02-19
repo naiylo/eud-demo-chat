@@ -1,3 +1,7 @@
+/**
+ * Scrollable message timeline with automatic scroll-to-bottom behavior.
+ * Filters hidden widget message types before rendering bubbles.
+ */
 import { useEffect, useMemo, useRef } from "react";
 import type { Persona, Message } from "../db/sqlite";
 import { MessageBubble } from "./MessageBubble";

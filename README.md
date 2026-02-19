@@ -15,7 +15,7 @@ Software systems are rarely static as they evolve continuously, and every change
 
 ### Inquiry
 
-When non-programmers create widgets for messaging platforms, they face three core problems: they struggle to anticipate edge cases in their widget's behavior, they have limited ability to understand and debug errors when things go wrong, and they face uncertainty about how their widget will behave at runtime across different usage scenarios. Prior approaches to change impact analysis such as symbolic execution or LLM-based code inspection either seem too complex to apply efficiently or risk producing hallucinated results.
+When non-programmers create widgets for messaging platforms, they face three core problems: they struggle to anticipate edge cases in their widget's behavior, they have limited ability to understand and debug errors when things go wrong, and they face uncertainty about how their widget will behave at runtime across different usage scenarios. Prior approaches to change impact analysis such as symbolic execution or LLM-based code inspection either seem too complex to apply efficiently or risk producing hallucinated results. Prior work in end-user programming suggests that uncertainty about how a program will behave in general is a key barrier to adoption. FlashProg, for instance, introduced Program Navigation and Conversational Clarification interfaces to help users resolve ambiguity by surfacing alternative program behaviors and asking targeted, example-driven questions (Soares et al., UIST 2015). Systems like Whyline have similarly focused on making program behavior interpretable to non-programmers, though they largely depend on users initiating queries after something has already gone wrong, rather than surfacing potential issues ahead of time. Our work takes a different approach, rather than waiting for failures or requiring users to write test cases or read code, we aim to give users grounded, proactive feedback about how changes affect messaging widget behavior automatically generating varied action traces and flagging unexpected effects on message streams before problems arise in the actual runtime.
 
 ### Approach
 
@@ -38,10 +38,12 @@ As end-user development matures, ensuring that non-programmers can build reliabl
 Future improvements could include:
 
 #### Make assumption about actions described by the user
+
 - Add labeling to individual functions that automatically load a partion of the heuritics, giving the user a push into the right direction in terms of which heuritics may be be relevant for the certain action
 - For example: action naming could reveal whether it is a CRUD operation
 
 #### General (outwritten) principles to derive generic heuristics for message streams
+
 - What does a malicious message stream look like? Can we extract principles to derive heuristics automatically?
 - Empty messages? Wrong author? Timestamp differences? ...
 
@@ -81,6 +83,7 @@ src/
 ├── exampleWidgets/
 .   └── brokenpoll.tsx            # intentionally broken widget for diagnostics
 .   └── examplepoll.tsx           # baseline poll widget example
+.   └── examplebillsplitter.tsx   # basic bill splitter widget example
 .   └── multiplechoicepoll.tsx    # multi-option poll widget example
 ├── generator/...                 # code and widget generation pipeline
 ├── generics/...                  # shared generic helpers and abstractions

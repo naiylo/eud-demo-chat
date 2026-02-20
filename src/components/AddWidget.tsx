@@ -12,6 +12,7 @@ import type { DemoActionImpact } from "../widgets/demoDiagnostics";
 import { WidgetPreviewDemo } from "./WidgetPreviewDemo";
 import type { Action, ActionLogEntry } from "../generics/actions";
 import { isOfSchema } from "../generics/objects";
+import { mulberry32 } from "../generator/prng";
 
 const widgetGlobal = globalThis as typeof globalThis & {
   __widgetReact?: typeof React;
@@ -109,6 +110,7 @@ export function AddWidget() {
   const [diagnosticOpen, setDiagnosticOpen] = useState(false);
   const [diagnosticWidget, setDiagnosticWidget] =
     useState<ChatWidgetDefinition | null>(null);
+  const [seed] = useState(Date.now());
   const [diagnosticStreams, setDiagnosticStreams] = useState<
     { id: string; label: string }[]
   >([]);
@@ -228,24 +230,25 @@ export function AddWidget() {
       const failingStreams: { id: string; label: string }[] = [];
       const streamLogs: Record<string, ActionLogEntry[]> = {};
 
-      for (const stream of streams) {
+      for (let streamIndex = 0; streamIndex < streams.length; streamIndex++) {
+        const stream = streams[streamIndex];
         const actions: DemoActionImpact[] = [];
         let messages: Message[] = [];
 
         const observer = new DemoDatabaseObserver(
           () => messages,
-          ({ action, added, deleted, beforeCount, afterCount }) => {
+          ({ action, entityIds, added, beforeCount, afterCount }) => {
             const actors = Array.from(
               new Set(
-                [...added, ...deleted].map((m) => m.authorId).filter(Boolean)
+                added.map((m) => m.authorId).filter(Boolean)
               )
             );
             actions.push({
               id: `${action}-${Date.now()}-${actions.length + 1}`,
               action,
               actors,
+              entityIds,
               added,
-              deleted,
               beforeCount,
               afterCount,
               order: actions.length + 1,
@@ -254,20 +257,11 @@ export function AddWidget() {
           }
         );
 
-        const setMessages: React.Dispatch<React.SetStateAction<Message[]>> = (
-          updater
-        ) => {
-          messages =
-            typeof updater === "function"
-              ? (updater as (prev: Message[]) => Message[])(messages)
-              : updater;
-        };
-
         const observedActions = observer.wrap(
           widget.createActions({
-            addMessage: async () => {},
-            deleteMessage: async () => {},
-            setMessages,
+            addMessage: async (msg: Message) => {
+              messages = [...messages, msg];
+            },
             getMessagesSnapshot: () => messages,
           }) as Action[]
         );
@@ -277,9 +271,11 @@ export function AddWidget() {
 
         let streamLog: ActionLogEntry[] | undefined;
         try {
+          const streamRng = mulberry32(seed + streamIndex);
           const result = await stream.run({
             actions: observedActions,
             schemas: widget.schemas,
+            rng: streamRng,
             wait,
             getMessages: () => messages,
           });

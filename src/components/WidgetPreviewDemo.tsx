@@ -15,6 +15,7 @@ import type {
 } from "../widgets/demoDiagnostics";
 import type { Action, ActionLogEntry } from "../generics/actions";
 import { analyzeDependencies, replayActionLog } from "../generator/fuzzer";
+import { mulberry32 } from "../generator/prng";
 
 const summarizeTypes = (messages: Message[]) => {
   const counts = messages.reduce<Record<string, number>>((acc, msg) => {
@@ -31,10 +32,6 @@ const describeImpact = (action: DemoActionImpact) => {
   if (action.added.length)
     parts.push(
       `created ${action.added.length} (${summarizeTypes(action.added)})`
-    );
-  if (action.deleted.length)
-    parts.push(
-      `removed ${action.deleted.length} (${summarizeTypes(action.deleted)})`
     );
   return parts.length ? parts.join(" | ") : "no database impact recorded";
 };
@@ -69,6 +66,7 @@ export function WidgetPreviewDemo({
   const [streamIndex, setStreamIndex] = useState(0);
   const [switchNotice, setSwitchNotice] = useState<string | null>(null);
   const [acceptedStreamId, setAcceptedStreamId] = useState<string | null>(null);
+  const [seed] = useState(Date.now());
 
   messagesRef.current = messages;
 
@@ -83,20 +81,11 @@ export function WidgetPreviewDemo({
     streamList.length > 0 && streamIndex === streamList.length - 1;
 
   const observedActions = useMemo(() => {
-    const syncSetMessages: typeof setMessages = (updater) => {
-      const next =
-        typeof updater === "function"
-          ? (updater as (prev: Message[]) => Message[])(messagesRef.current)
-          : updater;
-      messagesRef.current = next;
-      setMessages(next);
-    };
-
     const observer = new DemoDatabaseObserver(
       () => messagesRef.current,
-      ({ action, added, deleted, beforeCount, afterCount }) => {
+      ({ action, entityIds, added, beforeCount, afterCount }) => {
         const actors = Array.from(
-          new Set([...added, ...deleted].map((m) => m.authorId).filter(Boolean))
+          new Set(added.map((m) => m.authorId).filter(Boolean))
         );
 
         setActions((prev) => [
@@ -105,8 +94,8 @@ export function WidgetPreviewDemo({
             id: `${action}-${Date.now()}-${prev.length + 1}`,
             action,
             actors,
+            entityIds,
             added,
-            deleted,
             beforeCount,
             afterCount,
             order: prev.length + 1,
@@ -117,10 +106,11 @@ export function WidgetPreviewDemo({
     );
 
     const baseActions = widget.createActions({
-      // In this diagnostic view we let setMessages drive the state to avoid double-writes.
-      addMessage: async () => {},
-      deleteMessage: async () => {},
-      setMessages: syncSetMessages,
+      addMessage: async (msg: Message) => {
+        const next = [...messagesRef.current, msg];
+        messagesRef.current = next;
+        setMessages(next);
+      },
       getMessagesSnapshot: () => messagesRef.current,
     }) as Action[];
 
@@ -191,14 +181,12 @@ export function WidgetPreviewDemo({
     () => ({
       actions: actionsForLog.length,
       added: actionsForLog.reduce((sum, action) => sum + action.added.length, 0),
-      removed: actionsForLog.reduce((sum, action) => sum + action.deleted.length, 0),
       perAction: actionsForLog.reduce<
-        Record<string, { count: number; adds: number; dels: number }>
+        Record<string, { count: number; adds: number }>
       >((acc, action) => {
         const bucket = acc[action.action] ?? { count: 0, adds: 0, dels: 0 };
         bucket.count += 1;
         bucket.adds += action.added.length;
-        bucket.dels += action.deleted.length;
         acc[action.action] = bucket;
         return acc;
       }, {}),
@@ -210,9 +198,6 @@ export function WidgetPreviewDemo({
     const ordered = [...actionsForLog].sort((left, right) => left.order - right.order);
     const messageMap = new Map<string, Message>();
     ordered.forEach((action) => {
-      action.deleted.forEach((msg) => {
-        messageMap.delete(msg.id);
-      });
       action.added.forEach((msg) => {
         messageMap.set(msg.id, msg);
       });
@@ -246,11 +231,14 @@ export function WidgetPreviewDemo({
           ? replayLogs?.[activeStream.id]
           : undefined;
         if (replayLog && replayLog.length > 0) {
+          console.log("Replaying demo script from log for stream", activeStream.id);
           await replayActionLog(observedActions, replayLog);
         } else {
+          console.log("No replay log found for stream", activeStream.id, "— running demo script live");
           await script({
             actions: observedActions,
             schemas: widget.schemas,
+            rng: mulberry32(seed),
             wait,
             getMessages: () => messagesRef.current,
           });
@@ -262,7 +250,7 @@ export function WidgetPreviewDemo({
 
     isRunningRef.current = false;
     setIsRunning(false);
-  }, [activeStream, observedActions, widget.schemas, replayLogs]);
+  }, [activeStream, observedActions, widget.schemas, replayLogs, seed]);
 
   useEffect(() => {
     if (!activeStream) return;
@@ -456,7 +444,6 @@ export function WidgetPreviewDemo({
                       <p className="analytics-impact__title">{actionName}</p>
                       <p className="analytics-impact__desc">
                         {info.adds > 0 ? `${info.adds} created` : "0 created"} |{" "}
-                        {info.dels > 0 ? `${info.dels} removed` : "0 removed"}
                       </p>
                     </div>
                   </div>
@@ -559,8 +546,6 @@ export function WidgetPreviewDemo({
                   if (visibleAdded) widgetNotes.push(`${visibleAdded} visible`);
                   if (hiddenAdded)
                     widgetNotes.push(`${hiddenAdded} suppressed`);
-                  if (action.deleted.length)
-                    widgetNotes.push(`${action.deleted.length} removed`);
 
                   return (
                     <div

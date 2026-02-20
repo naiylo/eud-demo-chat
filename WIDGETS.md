@@ -85,7 +85,6 @@ const textMessageType = "text-message";
 
 function createActions({
   addMessage,
-  setMessages,
 }: WidgetActionDeps): Action[] {
   const sendText: Action = {
     name: "sendText",
@@ -119,7 +118,6 @@ function createActions({
       };
 
       await addMessage(msg);
-      setMessages((cur) => [...cur, msg]);
     },
   };
 

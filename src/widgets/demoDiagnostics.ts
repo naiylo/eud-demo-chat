@@ -4,6 +4,7 @@ import type { Action, ActionLogEntry } from "../generics/actions";
 import {
   collectReferencesFromInstance,
   isObjectInstance,
+  type ObjectInstance,
   type ObjectSchema,
 } from "../generics/objects";
 import type { HeuristicDisableMap } from "./types";
@@ -18,8 +19,8 @@ export type DemoActionImpact = {
   id: string;
   action: string;
   actors: string[];
+  entityIds: string[];
   added: Message[];
-  deleted: Message[];
   beforeCount: number;
   afterCount: number;
   order: number;
@@ -46,6 +47,7 @@ export type HeuristicFinding = {
 export type DemoScriptContext = {
   actions: Action[];
   schemas: ObjectSchema[];
+  rng: () => number;
   wait: (ms: number) => Promise<void>;
   getMessages: () => Message[];
 };
@@ -58,30 +60,6 @@ export type DemoStream = {
 };
 
 export const HEURISTIC_RULES: HeuristicRule[] = [
-  {
-    id: "deleted-multiple-messages",
-    label: "Action removed multiple messages",
-    severity: "weird",
-    evaluate: (action) => {
-      const removed = action.deleted.length;
-      return {
-        hit: removed > 1,
-        detail: `Removed ${removed} messages`,
-      };
-    },
-  },
-  {
-    id: "no-db-change",
-    label: "Action executed without message stream change",
-    severity: "warn",
-    evaluate: (action) => ({
-      hit:
-        action.added.length === 0 &&
-        action.deleted.length === 0 &&
-        action.beforeCount === action.afterCount,
-      detail: "Action returned but did not persist a change to the message stream",
-    }),
-  },
   {
     id: "multiple-identical-messages",
     label: "Action created multiple identical messages",
@@ -137,7 +115,7 @@ export const HEURISTIC_RULES: HeuristicRule[] = [
 
 export const DEMO_STREAMS: DemoStream[] = [];
 
-for (let i = 0; i < 100; i++) {
+for (let i = 0; i < 500; i++) {
   DEMO_STREAMS.push({
     id: `random-stream-${i + 1}`,
     label: `Stream ${i + 1}`,
@@ -153,8 +131,8 @@ export class DemoDatabaseObserver {
   private getSnapshot: () => Message[];
   private onChange: (info: {
     action: string;
+    entityIds: string[];
     added: Message[];
-    deleted: Message[];
     beforeCount: number;
     afterCount: number;
   }) => void;
@@ -163,8 +141,8 @@ export class DemoDatabaseObserver {
     getSnapshot: () => Message[],
     onChange: (info: {
       action: string;
+      entityIds: string[];
       added: Message[];
-      deleted: Message[];
       beforeCount: number;
       afterCount: number;
     }) => void,
@@ -174,20 +152,41 @@ export class DemoDatabaseObserver {
   }
 
   wrap(actions: Action[]): Action[] {
+    const collectEntityIdsFromInput = (
+      input: Record<string, ObjectInstance[]>,
+    ) => {
+      const ids = new Set<string>();
+
+      Object.values(input).forEach((instances) => {
+        instances.forEach((instance) => {
+          if (!isObjectInstance(instance))
+            return;
+
+          ids.add(instance.id);
+          collectReferencesFromInstance(instance).forEach((refId) => {
+            ids.add(refId);
+          });
+        });
+      });
+
+      return Array.from(ids);
+    };
+
     actions.forEach((action) => {
       const originalExecute = action.execute;
       action.execute = async (input) => {
         const before = [...this.getSnapshot()];
+        const entityIds = collectEntityIdsFromInput(input);
         const result = await originalExecute.call(action, input);
         const after = [...this.getSnapshot()];
 
         const added = after.filter((a) => !before.some((b) => b.id === a.id));
-        const deleted = before.filter((b) => !after.some((a) => a.id === b.id));
+
 
         this.onChange({
           action: action.name,
+          entityIds,
           added,
-          deleted,
           beforeCount: before.length,
           afterCount: after.length,
         });
@@ -244,10 +243,28 @@ export const minimizeActionLog = (
     return actions;
 
   const actionById = new Map(actions.map((action) => [action.id, action]));
+  const actionEntityIdsById = new Map<string, Set<string>>();
+  const entityIdActionIds = new Map<string, string[]>();
   const messageCreationMap = new Map<string, string>();
   actions.forEach((action) => {
+    const entityIds = new Set<string>(action.entityIds);
+
     action.added.forEach((msg) => {
       messageCreationMap.set(msg.id, action.id);
+
+      if (isObjectInstance(msg.custom)) {
+        entityIds.add(msg.custom.id);
+        collectReferencesFromInstance(msg.custom).forEach((refId) => {
+          entityIds.add(refId);
+        });
+      }
+    });
+
+    actionEntityIdsById.set(action.id, entityIds);
+    entityIds.forEach((entityId) => {
+      const existing = entityIdActionIds.get(entityId) ?? [];
+      existing.push(action.id);
+      entityIdActionIds.set(entityId, existing);
     });
   });
   const selectedActionIds = new Set<string>();
@@ -288,12 +305,17 @@ export const minimizeActionLog = (
     };
 
     action.added.forEach(inspectMessage);
-    action.deleted.forEach((message) => {
-      const creatorId = messageCreationMap.get(message.id);
-      if (creatorId) 
-        deps.add(creatorId);
 
-      inspectMessage(message);
+    const relatedEntityIds = actionEntityIdsById.get(action.id);
+    relatedEntityIds?.forEach((entityId) => {
+      const relatedActions = entityIdActionIds.get(entityId) ?? [];
+      relatedActions.forEach((relatedActionId) => {
+        const relatedAction = actionById.get(relatedActionId);
+        if (!relatedAction || relatedAction.order >= action.order)
+          return;
+
+        deps.add(relatedActionId);
+      });
     });
 
     return deps;

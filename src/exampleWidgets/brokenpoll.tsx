@@ -6,7 +6,7 @@ import type {
   WidgetComposerProps,
   WidgetRenderProps,
 } from "../widgets/types";
-import type { Action } from "../generics/actions";
+import type { Action, ActionLogEntry } from "../generics/actions";
 import {
   isOfSchema,
   newObjectInstance,
@@ -51,11 +51,59 @@ const voteSchema: ObjectSchema = {
 
 const pollMsgtype = "brokenpoll";
 const voteMsgtype = "brokenvote";
+const deleteVoteMsgtype = "brokenrmvote";
+
+function activeVotesOfAuthor(
+  log: Message[] | ActionLogEntry[],
+  pollId: string,
+  authorId: string,
+): ObjectInstance[] {
+  const activeVotes: ObjectInstance[] = [];
+
+  for (const entry of log) {
+    const vote = (
+      "custom" in entry && isOfSchema(entry.custom, "vote")
+        ? entry.custom
+        : "input" in entry && entry.input["vote"]?.[0]
+          ? entry.input["vote"]?.[0]
+          : undefined
+    ) as ObjectInstance | undefined;
+
+    if (
+      !vote ||
+      vote.properties["authorId"] !== authorId ||
+      vote.properties["pollId"] !== pollId
+    )
+      continue;
+
+    if (
+      ("type" in entry && entry.type === voteMsgtype) ||
+      ("action" in entry && entry.action === "addVote")
+    ) {
+      activeVotes.push(vote);
+      continue;
+    }
+
+    if (
+      ("type" in entry && entry.type === deleteVoteMsgtype) ||
+      ("action" in entry && entry.action === "deleteVote")
+    ) {
+      const index = activeVotes.findIndex(
+        (v) =>
+          v.properties["authorId"] === authorId &&
+          v.properties["pollId"] === pollId,
+      );
+      if (index !== -1) {
+        activeVotes.splice(index, 1);
+      }
+    }
+  }
+
+  return activeVotes;
+}
 
 function createActions({
   addMessage,
-  deleteMessage,
-  setMessages,
   getMessagesSnapshot,
 }: WidgetActionDeps): Action[] {
   const createPoll: Action = {
@@ -83,7 +131,9 @@ function createActions({
       ) {
         const prompt = poll.properties["prompt"] as string;
         const options = poll.properties["options"] as PollOption[];
+
         if (!prompt.trim() || options.length < 2) return;
+
         const msg: Message = {
           id: poll.id,
           authorId: poll.properties["authorId"] as string,
@@ -92,8 +142,8 @@ function createActions({
           type: pollMsgtype,
           custom: poll,
         };
+
         await addMessage(msg);
-        setMessages((cur) => [...cur, msg]);
       }
     },
   };
@@ -110,6 +160,7 @@ function createActions({
           if (!vote) {
             return false;
           }
+
           const pollId = vote.properties["pollId"] as string;
           return previousActions.some(
             (a) =>
@@ -128,26 +179,9 @@ function createActions({
           const pollId = vote.properties["pollId"] as string;
           const authorId = vote.properties["authorId"] as string;
 
-          let hasVote = false;
-          for (let i = previousActions.length - 1; i >= 0; i--) {
-            const action = previousActions[i];
-            const actionPollId =
-              action.input["vote"]?.[0]?.properties["pollId"];
-            const actionAuthorId =
-              action.input["vote"]?.[0]?.properties["authorId"];
-
-            if (actionPollId === pollId && actionAuthorId === authorId) {
-              if (action.action === "addVote") {
-                hasVote = true;
-                break;
-              } else if (action.action === "deleteVote") {
-                hasVote = false;
-                break;
-              }
-            }
-          }
-
-          return !hasVote;
+          return (
+            activeVotesOfAuthor(previousActions, pollId, authorId).length === 0
+          );
         },
       },
     ],
@@ -163,15 +197,12 @@ function createActions({
     ],
     execute: async (input: Record<string, ObjectInstance[]>) => {
       const vote = input.vote[0];
-      const alreadyVoted = getMessagesSnapshot().some(
-        (m) =>
-          m.type === voteMsgtype &&
-          m.custom &&
-          isOfSchema(m.custom, "vote") &&
-          m.custom.properties["pollId"] === vote.properties["pollId"] &&
-          m.authorId === vote.properties["authorId"],
-      );
-      if (alreadyVoted) {
+      const pollId = vote.properties["pollId"] as string;
+      const authorId = vote.properties["authorId"] as string;
+
+      if (
+        activeVotesOfAuthor(getMessagesSnapshot(), pollId, authorId).length > 0
+      ) {
         console.log("Author has already voted on this poll.");
         return;
       }
@@ -184,7 +215,6 @@ function createActions({
         type: voteMsgtype,
         custom: vote,
       };
-      setMessages((cur) => [...cur, voteMsg]);
       await addMessage(voteMsg);
     },
   };
@@ -201,27 +231,9 @@ function createActions({
           if (!vote) return false;
           const pollId = vote.properties["pollId"] as string;
           const authorId = vote.properties["authorId"] as string;
-          let hasVote = false;
-          for (let i = previousActions.length - 1; i >= 0; i--) {
-            const action = previousActions[i];
-            const actionPollId =
-              action.input["vote"]?.[0]?.properties["pollId"];
-            const actionAuthorId =
-              action.input["vote"]?.[0]?.properties["authorId"];
-
-            if (actionPollId === pollId && actionAuthorId === authorId) {
-              if (action.action === "addVote") {
-                hasVote = true;
-                break;
-              }
-              if (action.action === "deleteVote") {
-                hasVote = false;
-                break;
-              }
-            }
-          }
-
-          return hasVote;
+          return (
+            activeVotesOfAuthor(previousActions, pollId, authorId).length > 0
+          );
         },
       },
     ],
@@ -240,13 +252,14 @@ function createActions({
               a.input["vote"]?.[0]?.properties["pollId"] === pollId &&
               a.input["vote"]?.[0]?.properties["authorId"] === authorId,
           );
-          const isVoted = nextActions.some(
+          const isRemoved = nextActions.some(
             (a) =>
-              a.action === "addVote" &&
+              a.action === "deleteVote" &&
               a.input["vote"]?.[0]?.properties["pollId"] === pollId &&
               a.input["vote"]?.[0]?.properties["authorId"] === authorId,
           );
-          return wasVoted && !isVoted;
+
+          return wasVoted && isRemoved;
         },
       },
     ],
@@ -261,31 +274,59 @@ function createActions({
     ],
     execute: async (input: Record<string, ObjectInstance[]>) => {
       const vote = input.vote[0];
-      const votesToDelete = getMessagesSnapshot().filter(
-        (m) =>
-          m.type === voteMsgtype &&
-          m.custom &&
-          isOfSchema(m.custom, "vote") &&
-          m.authorId === vote.properties["authorId"],
-      );
-      if (votesToDelete.length === 0) {
-        console.log("No existing vote found for author " + vote.properties["authorId"] + " on poll " + vote.properties["pollId"]);
+      const pollId = vote.properties["pollId"] as string;
+      const authorId = vote.properties["authorId"] as string;
+
+      const activeVotes = [];
+
+      for (const entry of getMessagesSnapshot()) {
+        const vote = (
+          "custom" in entry && isOfSchema(entry.custom, "vote")
+            ? entry.custom
+            : undefined
+        ) as ObjectInstance | undefined;
+
+        if (
+          !vote ||
+          vote.properties["authorId"] !== authorId /*||
+          Missing poll check
+          vote.properties["pollId"] !== pollId
+        */)
+          continue;
+
+        if ("type" in entry && entry.type === voteMsgtype) {
+          activeVotes.push(vote);
+          continue;
+        }
+
+        if ("type" in entry && entry.type === deleteVoteMsgtype) {
+          const index = activeVotes.findIndex(
+            (v) =>
+              v.properties["authorId"] === authorId &&
+              v.properties["pollId"] === pollId,
+          );
+          if (index !== -1) {
+            activeVotes.splice(index, 1);
+          }
+        }
+      }
+      if (activeVotes.length === 0) {
+        console.log("Author has not voted on this poll.");
         return;
       }
-      setMessages((cur) =>
-        cur.filter(
-          (m) =>
-            !(
-              m.type === voteMsgtype &&
-              m.custom &&
-              isOfSchema(m.custom, "vote") &&
-              m.authorId === vote.properties["authorId"]
-            ),
-        ),
-      );
 
-      for (const vote of votesToDelete) {
-        await deleteMessage(vote.id);
+      console.log("Deleting votes:", activeVotes.length);
+
+      for (const activeVote of activeVotes) {
+        const deleteVoteMsg: Message = {
+          id: `rm-vote-${Date.now()}`,
+          authorId: vote.properties["authorId"] as string,
+          text: "",
+          timestamp: new Date().toISOString(),
+          type: deleteVoteMsgtype,
+          custom: activeVote,
+        };
+        await addMessage(deleteVoteMsg);
       }
     },
   };
@@ -395,14 +436,26 @@ function PollView({
   const poll = message.custom as ObjectInstance;
 
   const options = poll.properties["options"] as PollOption[];
-  const votes = allMessages.filter(
-    (m): m is Message & { custom: ObjectInstance } =>
-      m.type === voteMsgtype &&
-      isOfSchema(m.custom, "vote") &&
-      m.custom?.properties["pollId"] === poll.id,
-  );
+  const votes = useMemo(() => {
+    const authors = new Set<string>();
+
+    for (const entry of allMessages) {
+      if (!entry.custom || !isOfSchema(entry.custom, "vote")) continue;
+      if (entry.custom.properties["pollId"] !== poll.id) continue;
+
+      authors.add(entry.authorId);
+    }
+
+    return Array.from(authors)
+      .map((authorId) => activeVotesOfAuthor(allMessages, poll.id, authorId))
+      .filter((votes) => votes.length > 0)
+      .map((votes) => votes[0]);
+  }, [allMessages, poll.id]);
   const totalVotes = votes.length;
-  const myVote = votes.find((v) => v.authorId === currentActorId);
+  const myVote = useMemo(
+    () => activeVotesOfAuthor(allMessages, poll.id, currentActorId)[0],
+    [allMessages, poll.id, currentActorId],
+  );
 
   const handleVote = async (optionId: string) => {
     const addVoteAction = actions.find((a) => a.name === "addVote");
@@ -420,14 +473,14 @@ function PollView({
       });
       return;
     }
-    if (myVote.custom.properties["optionId"] === optionId) {
+    if (myVote.properties["optionId"] === optionId) {
       await deleteVoteAction.execute({
-        vote: [myVote.custom],
+        vote: [myVote],
       });
       return;
     }
     await deleteVoteAction.execute({
-      vote: [myVote.custom],
+      vote: [myVote],
     });
     await addVoteAction.execute({
       vote: [
@@ -450,12 +503,12 @@ function PollView({
       <div className="poll-options">
         {options.map((option) => {
           const optionVotes = votes.filter(
-            (v) => v.custom.properties["optionId"] === option.id,
+            (v) => v.properties["optionId"] === option.id,
           );
           const percent = totalVotes
             ? Math.round((optionVotes.length / totalVotes) * 100)
             : 0;
-          const checked = myVote?.custom.properties["optionId"] === option.id;
+          const checked = myVote?.properties["optionId"] === option.id;
           return (
             <button
               key={option.id}
@@ -482,7 +535,8 @@ function PollView({
               {optionVotes.length > 0 && (
                 <div className="poll-votees">
                   {optionVotes.map((vote) => {
-                    const persona = personaLookup[vote.authorId];
+                    const persona =
+                      personaLookup[vote.properties["authorId"] as string];
                     if (!persona) return null;
                     return (
                       <span
@@ -641,11 +695,10 @@ export const brokenpoll: ChatWidgetDefinition<Action[]> = {
   },
   schemas: [pollSchema, voteSchema],
   createActions,
-  hideMessage: (message) => message.type === voteMsgtype,
+  hideMessage: (message) =>
+    message.type === voteMsgtype || message.type === deleteVoteMsgtype,
   disabledHeuristicsByAction: {
     all: [
-      "deleted-multiple-messages",
-      "no-db-change",
       "multiple-identical-messages",
       "empty-message-created",
     ],

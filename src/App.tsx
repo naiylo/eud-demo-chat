@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getPersonas,
   getMessages,
-  addMessage,
+  addMessage as persistMessage,
   clearMessages,
   deleteMessage,
 } from "./db/sqlite";
@@ -21,8 +21,13 @@ import "./styles/styles.css";
 export default function App() {
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const messagesRef = useRef<Message[]>([]);
   const [selectedAuthorId, setSelectedAuthorId] = useState("");
   const [showDataPanel, setShowDataPanel] = useState(false);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     (async () => {
@@ -35,10 +40,11 @@ export default function App() {
 
   const widgetActions: WidgetActionMap = useMemo(() => {
     const deps = {
-      addMessage,
-      deleteMessage,
-      setMessages,
-      getMessagesSnapshot: () => messages,
+      addMessage: async (msg: Message) => {
+        await persistMessage(msg);
+        setMessages((cur) => [...cur, msg]);
+      },
+      getMessagesSnapshot: () => messagesRef.current,
     };
     return Object.fromEntries(
       widgetRegistry.map((w) => [
@@ -46,7 +52,7 @@ export default function App() {
         w.createActions(deps),
       ])
     ) as WidgetActionMap;
-  }, [addMessage, deleteMessage, messages, setMessages]);
+  }, []);
 
   // Message sending is now handled by the message widget actions (registry-based)
   const handleSend = async (text: string, authorId: string) => {

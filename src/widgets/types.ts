@@ -1,11 +1,9 @@
-import type { Dispatch, SetStateAction, ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { Message, MessageType, Persona } from "../db/sqlite";
 import type { ObjectSchema } from "../generics/objects";
 
 export type WidgetActionDeps = {
   addMessage: (msg: Message) => Promise<void>;
-  deleteMessage: (id: string) => Promise<void>;
-  setMessages: Dispatch<SetStateAction<Message[]>>;
   getMessagesSnapshot: () => Message[];
 };
 

@@ -5,7 +5,6 @@ import {
     type ObjectSchema,
 } from "../generics/objects";
 import type { DemoScriptContext } from "../widgets/demoDiagnostics";
-import { mulberry32 } from "./prng";
 
 const REFERENCE_ID_LENGTH = 16;
 
@@ -149,12 +148,11 @@ export function analyzeDependencies(actions: Action[]): Action[] | undefined {
 
 export async function generateRandomFlow(
     ctx: DemoScriptContext,
-    personas: string[]
+    personas: string[],
 ): Promise<ActionLogEntry[]> {
     objects = {};
     const actions = ctx.actions as Action[];
-    const rng = mulberry32(Math.floor(Math.random() * 1000000));
-    const log: ActionLogEntry[] = await randomLog(personas, actions, 50, rng);
+    const log: ActionLogEntry[] = await randomLog(personas, actions, 50, ctx.rng);
 
     for (const entry of log) {
         const action = actions.find((a) => a.name === entry.action);

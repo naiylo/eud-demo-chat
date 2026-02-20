@@ -4,6 +4,7 @@ Quick links:
 
 - [Abstract](#abstract)
 - [TL;DR](#tldr)
+- [How To Run](#how-to-run)
 - [Repository Structure](#repository-structure)
 - [Further Documentation](#further-documentation)
 

@@ -1,3 +1,7 @@
+/**
+ * Modal hub for widget authoring and testing.
+ * Hosts add-widget flow, demo tab, and per-widget composer UIs.
+ */
 import { useState } from "react";
 import type { ChatWidgetDefinition, WidgetActionMap } from "../widgets/types";
 import { AddWidget } from "./AddWidget";

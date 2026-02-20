@@ -1,3 +1,7 @@
+/**
+ * Basic text composer used for plain chat messages.
+ * Keeps author selection in sync with the sidebar selection.
+ */
 import { useState, useEffect } from "react";
 import type { Persona } from "../db/sqlite";
 

@@ -4,7 +4,7 @@ Quick links:
 
 - [Abstract](#abstract)
 - [TL;DR](#tldr)
-- [Repository Oversight](#repository-oversight)
+- [Repository Structure](#repository-structure)
 - [Further Documentation](#further-documentation)
 
 ## Abstract

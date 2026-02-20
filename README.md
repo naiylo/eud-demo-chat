@@ -23,7 +23,7 @@ We developed a system that automatically detects and communicates the behavioral
 
 ### Knowledge
 
-Our system demonstrates that fuzzing over a widget's action and data model, combined with lightweight stream-level heuristics, can surface suspicious widget behaviors. Critically, this approach operates purely on the message stream, making it applicable even when widget intent cannot be inferred from appearance alone. The system also generates concrete example streams that illustrate heuristically flagged behaviors, giving non-technical users an accessible entry point for understanding and correcting problems in their widgets. Beyond detection, our system supports users throughout the entire widget creation process by actively monitoring their widget for potential risks as it is being built. Individual heuristic warnings can be dismissed by the user, ensuring that they retain full control and final judgment over which flagged behaviors are genuinely problematic and which are intentional design decisions.
+Our system demonstrates that fuzzing over a widget's action and data model, combined with lightweight stream-level heuristics, can surface suspicious widget behaviors. Critically, this approach operates purely on the message stream, making it applicable even when widget intent cannot be inferred from appearance alone. The system also generates concrete example streams that illustrate heuristically flagged behaviors, giving non-technical users an accessible entry point for understanding and correcting problems in their widgets. Beyond detection, our system supports users throughout the entire widget creation process by actively monitoring their widget for suspicious behaviors, such as the removal of multiple messages. Individual heuristic warnings can be dismissed by the user, ensuring that they retain full control and final judgment over which flagged behaviors are genuinely problematic and which are intentional design decisions.
 
 ### Grounding
 
@@ -39,10 +39,10 @@ Future improvements could include:
 
 #### Make assumption about actions described by the user
 
-- Add labeling to individual functions that automatically load a partion of the heuritics, giving the user a push into the right direction in terms of which heuritics may be be relevant for the certain action
+- Add labeling to individual functions that automatically load a partion of the heuristics, giving the user a push into the right direction in terms of which heuristics may be be relevant for the certain action
 - For example: action naming could reveal whether it is a CRUD operation
 
-#### General (outwritten) principles to derive generic heuristics for message streams
+#### General principles to derive generic heuristics for message streams
 
 - What does a malicious message stream look like? Can we extract principles to derive heuristics automatically?
 - Empty messages? Wrong author? Timestamp differences? ...

@@ -63,7 +63,6 @@ const formatCurrency = (value: number) => `$${value.toFixed(2)}`;
 
 function createActions({
   addMessage,
-  setMessages,
   getMessagesSnapshot,
 }: WidgetActionDeps): Action[] {
   const createBill: Action = {
@@ -108,7 +107,6 @@ function createActions({
       };
 
       await addMessage(msg);
-      setMessages((cur) => [...cur, msg]);
     },
   };
 
@@ -175,7 +173,6 @@ function createActions({
         custom: normalizedContribution,
       };
 
-      setMessages((cur) => [...cur, contributionMessage]);
       await addMessage(contributionMessage);
     },
   };

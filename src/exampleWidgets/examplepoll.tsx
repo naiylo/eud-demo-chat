@@ -1,3 +1,7 @@
+/*
+  This is a poll widget that allows to create polls with multiple options and vote on them.
+*/
+
 import { useMemo, useState } from "react";
 import type { Message, Persona } from "../db/sqlite";
 import type {
@@ -61,17 +65,33 @@ function activeVotesOfAuthor(
   const activeVotes: ObjectInstance[] = [];
 
   for (const entry of log) {
-    const vote = ("custom" in entry && isOfSchema(entry.custom, "vote") ? entry.custom : ("input" in entry && entry.input["vote"]?.[0] ? entry.input["vote"]?.[0] : undefined)) as ObjectInstance | undefined;
+    const vote = (
+      "custom" in entry && isOfSchema(entry.custom, "vote")
+        ? entry.custom
+        : "input" in entry && entry.input["vote"]?.[0]
+          ? entry.input["vote"]?.[0]
+          : undefined
+    ) as ObjectInstance | undefined;
 
-    if (!vote || vote.properties["authorId"] !== authorId || vote.properties["pollId"] !== pollId) 
+    if (
+      !vote ||
+      vote.properties["authorId"] !== authorId ||
+      vote.properties["pollId"] !== pollId
+    )
       continue;
 
-    if ("type" in entry && entry.type === voteMsgtype || "action" in entry && entry.action === "addVote") {
+    if (
+      ("type" in entry && entry.type === voteMsgtype) ||
+      ("action" in entry && entry.action === "addVote")
+    ) {
       activeVotes.push(vote);
       continue;
     }
 
-    if (("type" in entry && entry.type === deleteVoteMsgtype) || ("action" in entry && entry.action === "deleteVote")) {
+    if (
+      ("type" in entry && entry.type === deleteVoteMsgtype) ||
+      ("action" in entry && entry.action === "deleteVote")
+    ) {
       const index = activeVotes.findIndex(
         (v) =>
           v.properties["authorId"] === authorId &&
@@ -116,8 +136,7 @@ function createActions({
         const prompt = poll.properties["prompt"] as string;
         const options = poll.properties["options"] as PollOption[];
 
-        if (!prompt.trim() || options.length < 2) 
-          return;
+        if (!prompt.trim() || options.length < 2) return;
 
         const msg: Message = {
           id: poll.id,
@@ -164,7 +183,9 @@ function createActions({
           const pollId = vote.properties["pollId"] as string;
           const authorId = vote.properties["authorId"] as string;
 
-          return activeVotesOfAuthor(previousActions, pollId, authorId).length === 0;
+          return (
+            activeVotesOfAuthor(previousActions, pollId, authorId).length === 0
+          );
         },
       },
     ],
@@ -183,8 +204,9 @@ function createActions({
       const pollId = vote.properties["pollId"] as string;
       const authorId = vote.properties["authorId"] as string;
 
-      if (activeVotesOfAuthor(getMessagesSnapshot(), pollId, authorId).length > 0) {
-        console.log("Author has already voted on this poll.");
+      if (
+        activeVotesOfAuthor(getMessagesSnapshot(), pollId, authorId).length > 0
+      ) {
         return;
       }
 
@@ -212,7 +234,9 @@ function createActions({
           if (!vote) return false;
           const pollId = vote.properties["pollId"] as string;
           const authorId = vote.properties["authorId"] as string;
-          return activeVotesOfAuthor(previousActions, pollId, authorId).length > 0;
+          return (
+            activeVotesOfAuthor(previousActions, pollId, authorId).length > 0
+          );
         },
       },
     ],
@@ -254,9 +278,11 @@ function createActions({
       const vote = input.vote[0];
       const pollId = vote.properties["pollId"] as string;
       const authorId = vote.properties["authorId"] as string;
-    
-      if (activeVotesOfAuthor(getMessagesSnapshot(), pollId, authorId).length === 0) {
-        console.log("Author has not voted on this poll.");
+
+      if (
+        activeVotesOfAuthor(getMessagesSnapshot(), pollId, authorId).length ===
+        0
+      ) {
         return;
       }
 
@@ -389,7 +415,8 @@ function PollView({
 
     return Array.from(authors)
       .map((authorId) => activeVotesOfAuthor(allMessages, poll.id, authorId))
-      .filter(votes => votes.length > 0).map(votes => votes[0]);
+      .filter((votes) => votes.length > 0)
+      .map((votes) => votes[0]);
   }, [allMessages, poll.id]);
   const totalVotes = votes.length;
   const myVote = useMemo(
@@ -475,7 +502,8 @@ function PollView({
               {optionVotes.length > 0 && (
                 <div className="poll-votees">
                   {optionVotes.map((vote) => {
-                    const persona = personaLookup[vote.properties["authorId"] as string];
+                    const persona =
+                      personaLookup[vote.properties["authorId"] as string];
                     if (!persona) return null;
                     return (
                       <span
@@ -634,12 +662,10 @@ export const examplepoll: ChatWidgetDefinition<Action[]> = {
   },
   schemas: [pollSchema, voteSchema],
   createActions,
-  hideMessage: (message) => message.type === voteMsgtype || message.type === deleteVoteMsgtype,
+  hideMessage: (message) =>
+    message.type === voteMsgtype || message.type === deleteVoteMsgtype,
   disabledHeuristicsByAction: {
-    all: [
-      "multiple-identical-messages",
-      "empty-message-created",
-    ],
+    all: ["multiple-identical-messages", "empty-message-created"],
     createPoll: [],
     addVote: [],
     deleteVote: [],

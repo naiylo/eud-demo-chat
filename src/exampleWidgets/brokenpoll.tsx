@@ -1,3 +1,7 @@
+/*
+  Unlike examplepoll, this widget has a bug where all votes of an user are removed if they try to change their vote, instead of just the previous one. This is because the deleteVote action does not check for the pollId when deleting votes, so if a user has voted on multiple polls, all their votes will be deleted when they try to change their vote on any poll.
+*/
+
 import { useMemo, useState } from "react";
 import type { Message, Persona } from "../db/sqlite";
 import type {
@@ -203,7 +207,6 @@ function createActions({
       if (
         activeVotesOfAuthor(getMessagesSnapshot(), pollId, authorId).length > 0
       ) {
-        console.log("Author has already voted on this poll.");
         return;
       }
 
@@ -291,7 +294,8 @@ function createActions({
           vote.properties["authorId"] !== authorId /*||
           Missing poll check
           vote.properties["pollId"] !== pollId
-        */)
+        */
+        )
           continue;
 
         if ("type" in entry && entry.type === voteMsgtype) {
@@ -311,11 +315,8 @@ function createActions({
         }
       }
       if (activeVotes.length === 0) {
-        console.log("Author has not voted on this poll.");
         return;
       }
-
-      console.log("Deleting votes:", activeVotes.length);
 
       for (const activeVote of activeVotes) {
         const deleteVoteMsg: Message = {
@@ -698,10 +699,7 @@ export const brokenpoll: ChatWidgetDefinition<Action[]> = {
   hideMessage: (message) =>
     message.type === voteMsgtype || message.type === deleteVoteMsgtype,
   disabledHeuristicsByAction: {
-    all: [
-      "multiple-identical-messages",
-      "empty-message-created",
-    ],
+    all: ["multiple-identical-messages", "empty-message-created"],
     createPoll: [],
     addVote: [],
     deleteVote: [],

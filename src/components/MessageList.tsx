@@ -38,15 +38,15 @@ export function MessageList({
         string,
         Persona
       >,
-    [personas]
+    [personas],
   );
 
   const visibleMessages = useMemo(
     () =>
       messages.filter(
-        (m) => !widgets.some((w) => w.hideMessage?.(m))
+        (m) => !widgets.some((w) => w.hideMessage?.(m)),
       ) as Message[],
-    [messages, widgets]
+    [messages, widgets],
   );
 
   return (

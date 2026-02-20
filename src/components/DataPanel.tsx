@@ -38,7 +38,11 @@ export function DataPanel({
         <header className="panel-header">
           <h3 id="data-modal-title">Conversation JSON</h3>
           <div className="panel-actions">
-            <button type="button" onClick={onClose} aria-label="Close JSON panel">
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close JSON panel"
+            >
               Close
             </button>
           </div>

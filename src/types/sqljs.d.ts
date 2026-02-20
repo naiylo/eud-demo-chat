@@ -36,4 +36,3 @@ declare module "sql.js/dist/sql-wasm.js" {
   const initSqlJs: (config?: InitSqlJsConfig) => Promise<SqlJsStatic>;
   export default initSqlJs;
 }
-

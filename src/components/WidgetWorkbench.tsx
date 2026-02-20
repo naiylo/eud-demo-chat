@@ -24,7 +24,7 @@ export function WidgetWorkbench({
   const ADD_WIDGET_KEY = "addWidget";
   const DEMO_TAB_KEY = "__demo__";
   const composerWidgets = widgets.filter(
-    (w) => w.elements?.composer ?? (w as any)?.composer
+    (w) => w.elements?.composer ?? (w as any)?.composer,
   );
   const defaultKey =
     composerWidgets[0]?.registryName ??
@@ -36,7 +36,7 @@ export function WidgetWorkbench({
   if (!open) return null;
 
   const currentComposer = composerWidgets.find(
-    (w) => (w.registryName ?? w.type) === mode
+    (w) => (w.registryName ?? w.type) === mode,
   );
 
   const modalClass =
@@ -67,7 +67,7 @@ export function WidgetWorkbench({
     try {
       const res = await fetch(
         `/api/widgets?name=${encodeURIComponent(target)}`,
-        { method: "DELETE" }
+        { method: "DELETE" },
       );
       if (!res.ok) {
         const text = await res.text();

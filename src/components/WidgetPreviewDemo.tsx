@@ -35,12 +35,10 @@ const describeImpact = (action: DemoActionImpact) => {
   const parts: string[] = [];
   if (action.added.length)
     parts.push(
-      `created ${action.added.length} (${summarizeTypes(action.added)})`
+      `created ${action.added.length} (${summarizeTypes(action.added)})`,
     );
   return parts.length ? parts.join(" | ") : "no database impact recorded";
 };
-
-
 
 export function WidgetPreviewDemo({
   widget,
@@ -89,7 +87,7 @@ export function WidgetPreviewDemo({
       () => messagesRef.current,
       ({ action, entityIds, added, beforeCount, afterCount }) => {
         const actors = Array.from(
-          new Set(added.map((m) => m.authorId).filter(Boolean))
+          new Set(added.map((m) => m.authorId).filter(Boolean)),
         );
 
         setActions((prev) => [
@@ -106,7 +104,7 @@ export function WidgetPreviewDemo({
             timestamp: Date.now(),
           },
         ]);
-      }
+      },
     );
 
     const baseActions = widget.createActions({
@@ -129,7 +127,7 @@ export function WidgetPreviewDemo({
         string,
         Persona
       >,
-    []
+    [],
   );
 
   const heuristicFindings = useMemo(
@@ -137,14 +135,14 @@ export function WidgetPreviewDemo({
       evaluateHeuristicFindings(
         actions,
         activeRuleIds,
-        widget.disabledHeuristicsByAction
+        widget.disabledHeuristicsByAction,
       ),
-    [actions, activeRuleIds, widget.disabledHeuristicsByAction]
+    [actions, activeRuleIds, widget.disabledHeuristicsByAction],
   );
 
   const actionsForLog = useMemo(
     () => minimizeActionLog(actions, heuristicFindings),
-    [actions, heuristicFindings]
+    [actions, heuristicFindings],
   );
 
   const displayFindings = useMemo(
@@ -152,9 +150,9 @@ export function WidgetPreviewDemo({
       evaluateHeuristicFindings(
         actionsForLog,
         activeRuleIds,
-        widget.disabledHeuristicsByAction
+        widget.disabledHeuristicsByAction,
       ),
-    [actionsForLog, activeRuleIds, widget.disabledHeuristicsByAction]
+    [actionsForLog, activeRuleIds, widget.disabledHeuristicsByAction],
   );
 
   const messageSourceMap = useMemo(() => {
@@ -184,7 +182,10 @@ export function WidgetPreviewDemo({
   const totals = useMemo(
     () => ({
       actions: actionsForLog.length,
-      added: actionsForLog.reduce((sum, action) => sum + action.added.length, 0),
+      added: actionsForLog.reduce(
+        (sum, action) => sum + action.added.length,
+        0,
+      ),
       perAction: actionsForLog.reduce<
         Record<string, { count: number; adds: number }>
       >((acc, action) => {
@@ -195,11 +196,13 @@ export function WidgetPreviewDemo({
         return acc;
       }, {}),
     }),
-    [actionsForLog]
+    [actionsForLog],
   );
 
   const messagesForLog = useMemo(() => {
-    const ordered = [...actionsForLog].sort((left, right) => left.order - right.order);
+    const ordered = [...actionsForLog].sort(
+      (left, right) => left.order - right.order,
+    );
     const messageMap = new Map<string, Message>();
     ordered.forEach((action) => {
       action.added.forEach((msg) => {
@@ -211,7 +214,7 @@ export function WidgetPreviewDemo({
 
   const visibleMessages = useMemo(
     () => messagesForLog.filter((msg) => !(widget.hideMessage?.(msg) ?? false)),
-    [messagesForLog, widget]
+    [messagesForLog, widget],
   );
 
   const canRunScript = Boolean(activeStream);
@@ -235,10 +238,8 @@ export function WidgetPreviewDemo({
           ? replayLogs?.[activeStream.id]
           : undefined;
         if (replayLog && replayLog.length > 0) {
-          console.log("Replaying demo script from log for stream", activeStream.id);
           await replayActionLog(observedActions, replayLog);
         } else {
-          console.log("No replay log found for stream", activeStream.id, "— running demo script live");
           await script({
             actions: observedActions,
             schemas: widget.schemas,
@@ -273,7 +274,7 @@ export function WidgetPreviewDemo({
     }
     if (initialStreamId) {
       const nextIndex = streamList.findIndex(
-        (stream) => stream.id === initialStreamId
+        (stream) => stream.id === initialStreamId,
       );
       if (nextIndex >= 0) {
         setStreamIndex(nextIndex);
@@ -299,7 +300,7 @@ export function WidgetPreviewDemo({
     setSwitchNotice(
       `Switched to ${nextStream.label} (stream ${nextIndex + 1} of ${
         streamList.length
-      })`
+      })`,
     );
     setAcceptedStreamId(null);
   };
@@ -398,7 +399,7 @@ export function WidgetPreviewDemo({
                   visibleMessages.map((msg) => {
                     const source = messageSourceMap.get(msg.id);
                     const findings = source
-                      ? heuristicsByAction.get(source.id) ?? []
+                      ? (heuristicsByAction.get(source.id) ?? [])
                       : [];
 
                     return (
@@ -447,7 +448,8 @@ export function WidgetPreviewDemo({
                     <div>
                       <p className="analytics-impact__title">{actionName}</p>
                       <p className="analytics-impact__desc">
-                        {info.adds > 0 ? `${info.adds} created` : "0 created"} |{" "}
+                        {info.adds > 0 ? `${info.adds} created` : "0 created"}{" "}
+                        |{" "}
                       </p>
                     </div>
                   </div>
@@ -542,7 +544,7 @@ export function WidgetPreviewDemo({
                 {actionsForLog.map((action) => {
                   const findings = heuristicsByAction.get(action.id) ?? [];
                   const visibleAdded = action.added.filter(
-                    (m) => !(widget.hideMessage?.(m) ?? false)
+                    (m) => !(widget.hideMessage?.(m) ?? false),
                   ).length;
                   const hiddenAdded = action.added.length - visibleAdded;
 
@@ -611,8 +613,8 @@ export function WidgetPreviewDemo({
               <div>
                 <h3 className="analytics-label">Play demo</h3>
                 <p className="analytics-note">
-                  Continue swaps in the next
-                  stream until you reach the final stream.
+                  Continue swaps in the next stream until you reach the final
+                  stream.
                 </p>
               </div>
               <div className="analytics-nav">

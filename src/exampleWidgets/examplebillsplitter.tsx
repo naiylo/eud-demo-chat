@@ -1,3 +1,7 @@
+/*
+  Another example for a widget. This one allows users to create bills and split them among a group of people. Users can create a bill with a title, total amount, and number of people sharing the bill. Then, they can add contributions to the bill, indicating how much each person has paid. The widget calculates the remaining amount for each person and displays the overall status of the bill (e.g., how much is left to be paid).
+*/
+
 import { useMemo, useState } from "react";
 import type { Message } from "../db/sqlite";
 import type { Action } from "../generics/actions";

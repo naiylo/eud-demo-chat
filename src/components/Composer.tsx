@@ -18,7 +18,7 @@ export function Composer({
 }) {
   const [text, setText] = useState("");
   const [authorId, setAuthorId] = useState(
-    selectedAuthorId || personas[0]?.id || ""
+    selectedAuthorId || personas[0]?.id || "",
   );
 
   useEffect(() => {

@@ -66,7 +66,7 @@ const importWidgetModule = async (source: string) => {
 };
 
 const isWidgetDefinition = (
-  candidate: unknown
+  candidate: unknown,
 ): candidate is ChatWidgetDefinition => {
   if (!candidate || typeof candidate !== "object") return false;
   const widget = candidate as ChatWidgetDefinition;
@@ -79,7 +79,7 @@ const isWidgetDefinition = (
 
 const resolveWidgetExport = (
   module: Record<string, any>,
-  exportName: string
+  exportName: string,
 ): ChatWidgetDefinition | null => {
   if (exportName && isWidgetDefinition(module[exportName])) {
     return module[exportName] as ChatWidgetDefinition;
@@ -108,7 +108,7 @@ const transpileWidgetSource = async (source: string) => {
 export function AddWidget() {
   const [code, setCode] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
-    "idle"
+    "idle",
   );
   const [message, setMessage] = useState("");
   const [diagnosticOpen, setDiagnosticOpen] = useState(false);
@@ -129,9 +129,9 @@ export function AddWidget() {
   const diagnosticOpenRef = useRef(false);
   const lastCodeRef = useRef(code);
   const [activeHeuristicIds, setActiveHeuristicIds] = useState(() =>
-    HEURISTIC_RULES.map((rule) => rule.id)
+    HEURISTIC_RULES.map((rule) => rule.id),
   );
-  
+
   const exportName = useMemo(() => {
     const match = code.match(/export const\s+(\w+)/);
     return match?.[1] ?? "customWidget";
@@ -139,11 +139,11 @@ export function AddWidget() {
 
   const activeHeuristicSet = useMemo(
     () => new Set(activeHeuristicIds),
-    [activeHeuristicIds]
+    [activeHeuristicIds],
   );
   const diagnosticStreamIds = useMemo(
     () => diagnosticStreams.map((stream) => stream.id),
-    [diagnosticStreams]
+    [diagnosticStreams],
   );
 
   const toggleHeuristic = (id: string) => {
@@ -155,7 +155,7 @@ export function AddWidget() {
         active.add(id);
       }
       return HEURISTIC_RULES.map((rule) => rule.id).filter((ruleId) =>
-        active.has(ruleId)
+        active.has(ruleId),
       );
     });
   };
@@ -180,13 +180,13 @@ export function AddWidget() {
       };
       setStatus("saved");
       setMessage(
-        `Saved ${payload.exportName} as ${payload.slug}.tsx and updated registry.`
+        `Saved ${payload.exportName} as ${payload.slug}.tsx and updated registry.`,
       );
     } catch (err) {
       console.error(err);
       setStatus("error");
       setMessage(
-        "Could not save widget. Make sure the dev server is running and you used export const <Name>."
+        "Could not save widget. Make sure the dev server is running and you used export const <Name>.",
       );
     }
   };
@@ -243,9 +243,7 @@ export function AddWidget() {
           () => messages,
           ({ action, entityIds, added, beforeCount, afterCount }) => {
             const actors = Array.from(
-              new Set(
-                added.map((m) => m.authorId).filter(Boolean)
-              )
+              new Set(added.map((m) => m.authorId).filter(Boolean)),
             );
             actions.push({
               id: `${action}-${Date.now()}-${actions.length + 1}`,
@@ -258,7 +256,7 @@ export function AddWidget() {
               order: actions.length + 1,
               timestamp: Date.now(),
             });
-          }
+          },
         );
 
         const observedActions = observer.wrap(
@@ -267,7 +265,7 @@ export function AddWidget() {
               messages = [...messages, msg];
             },
             getMessagesSnapshot: () => messages,
-          }) as Action[]
+          }) as Action[],
         );
 
         const wait = async (ms = 0) =>
@@ -291,19 +289,17 @@ export function AddWidget() {
         const findings = evaluateHeuristicFindings(
           actions,
           activeHeuristicIds,
-          widget.disabledHeuristicsByAction
+          widget.disabledHeuristicsByAction,
         );
         if (findings.length > 0) {
           const triggeredRules = Array.from(
-            new Map(
-              findings.map((finding) => [finding.ruleId, finding.label])
-            )
+            new Map(findings.map((finding) => [finding.ruleId, finding.label])),
           ).map(([ruleId, label]) => `${label} (${ruleId})`);
           console.debug(
             "[workbench] Heuristic check failed",
             `widget=${widget.type}`,
             `stream=${stream.id}`,
-            triggeredRules
+            triggeredRules,
           );
           failingStreams.push({ id: stream.id, label: stream.label });
           if (streamLog) {
@@ -434,7 +430,8 @@ export function AddWidget() {
             </div>
           )}
           <p className="add-widget-helper" style={{ marginTop: 8 }}>
-            Diagnostic view replays sample streams and highlights heuristic hits.
+            Diagnostic view replays sample streams and highlights heuristic
+            hits.
           </p>
         </section>
       </div>

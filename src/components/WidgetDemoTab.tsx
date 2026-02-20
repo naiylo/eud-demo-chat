@@ -6,7 +6,11 @@ import { useEffect, useMemo, useState } from "react";
 import type { ChatWidgetDefinition } from "../widgets/types";
 import { WidgetPreviewDemo } from "./WidgetPreviewDemo";
 
-export function WidgetDemoTab({ widgets }: { widgets: ChatWidgetDefinition[] }) {
+export function WidgetDemoTab({
+  widgets,
+}: {
+  widgets: ChatWidgetDefinition[];
+}) {
   const [previewKey, setPreviewKey] = useState("");
   const [previewKeyEdited, setPreviewKeyEdited] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -18,15 +22,15 @@ export function WidgetDemoTab({ widgets }: { widgets: ChatWidgetDefinition[] }) 
 
   const availableNames = useMemo(
     () => widgets.map((w) => w.registryName ?? w.type).filter(Boolean),
-    [widgets]
+    [widgets],
   );
   const normalizedKey = previewKey.trim();
   const matchedWidget = useMemo(
     () =>
       widgets.find(
-        (w) => w.registryName === normalizedKey || w.type === normalizedKey
+        (w) => w.registryName === normalizedKey || w.type === normalizedKey,
       ),
-    [widgets, normalizedKey]
+    [widgets, normalizedKey],
   );
   const showMissing = Boolean(normalizedKey) && !matchedWidget;
 
@@ -34,7 +38,10 @@ export function WidgetDemoTab({ widgets }: { widgets: ChatWidgetDefinition[] }) 
     <div className="workbench-demo">
       <section className="add-widget-pane">
         <h4>Sample demo</h4>
-        <label className="add-widget-helper" style={{ display: "grid", gap: 6 }}>
+        <label
+          className="add-widget-helper"
+          style={{ display: "grid", gap: 6 }}
+        >
           Preview widget (registry name)
           <input
             type="text"

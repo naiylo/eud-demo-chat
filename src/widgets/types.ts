@@ -1,3 +1,7 @@
+/*
+  Widget-specific types.
+*/
+
 import type { ReactNode } from "react";
 import type { Message, MessageType, Persona } from "../db/sqlite";
 import type { ObjectSchema } from "../generics/objects";

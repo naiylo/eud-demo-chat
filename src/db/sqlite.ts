@@ -1,3 +1,7 @@
+/*
+  SQLite database that is stored in the browser's localStorage. It has two tables: personas and messages. The personas table stores the information about the personas, while the messages table stores the chat messages. The database is initialized with some sample data if it's empty.
+*/
+
 import initSqlJs from "sql.js/dist/sql-wasm.js";
 import type { Database, SqlJsStatic } from "sql.js";
 import sqlWasm from "sql.js/dist/sql-wasm.wasm?url";
@@ -15,7 +19,7 @@ function fromBase64(b64: string) {
   return new Uint8Array(
     atob(b64)
       .split("")
-      .map((c) => c.charCodeAt(0))
+      .map((c) => c.charCodeAt(0)),
   );
 }
 
@@ -104,7 +108,7 @@ export function persist() {
 export async function getPersonas(): Promise<Persona[]> {
   const db = await getDB();
   const res = db.exec(
-    `SELECT id,name,color,bio FROM personas ORDER BY name ASC;`
+    `SELECT id,name,color,bio FROM personas ORDER BY name ASC;`,
   );
   const values = (res[0]?.values ?? []) as [string, string, string, string][];
   return values.map(([id, name, color, bio]) => ({
@@ -125,7 +129,9 @@ function parseCustom(raw: string): MessageCustom {
   }
 }
 
-export async function getMessages(authorId: string = "all"): Promise<Message[]> {
+export async function getMessages(
+  authorId: string = "all",
+): Promise<Message[]> {
   const db = await getDB();
   const sql =
     authorId === "all"
@@ -154,7 +160,7 @@ export async function getMessages(authorId: string = "all"): Promise<Message[]> 
 export async function addMessage(msg: Message) {
   const db = await getDB();
   const stmt = db.prepare(
-    `INSERT INTO messages (id,authorId,text,timestamp,type,custom) VALUES (?,?,?,?,?,?)`
+    `INSERT INTO messages (id,authorId,text,timestamp,type,custom) VALUES (?,?,?,?,?,?)`,
   );
 
   stmt.run([

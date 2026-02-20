@@ -6,10 +6,7 @@ import {
   clearMessages,
   deleteMessage,
 } from "./db/sqlite";
-import type {
-  Persona,
-  Message,
-} from "./db/sqlite";
+import type { Persona, Message } from "./db/sqlite";
 import { PersonaSidebar } from "./components/PersonaSidebar";
 import { ChatWindow } from "./components/ChatWindow";
 import { DataPanel } from "./components/DataPanel";
@@ -50,7 +47,7 @@ export default function App() {
       widgetRegistry.map((w) => [
         w.registryName ?? w.type,
         w.createActions(deps),
-      ])
+      ]),
     ) as WidgetActionMap;
   }, []);
 
